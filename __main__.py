@@ -1,11 +1,14 @@
-# AddQuery object
+# If databases don't exist, initialise them
 
-#########################
-## alterStock function ##
-#########################
+# A global Tkinter widget is being used here because there is no point in the
+# program when a widget should not be on screen, and all operations rely on
+# morphing the same widget. Global variables would ideally be const, but that
+# is obviously not possible here
+# widget = global Tkinter widget
 
-### def alterStock(widget, Add) ##
-
+#################################
+## def alterStock (Add : bool) ##
+#################################
 # initialise query to null
 # if Add:
 #   query = AddQuery()
@@ -34,11 +37,9 @@
 # return
 
 
-#########################
-## checkStock function ##
-#########################
-
-## def checkStock(widget) ##
+######################
+## def checkStock() ##
+######################
 
 # initialise query to null
 # Ask to choose between querying a batch; querying transactions; or querying total stock levels
@@ -61,3 +62,26 @@
 #   Display error message saying failed to find
 # return
 
+
+
+###################
+## MAIN FUNCTION ##
+### def main(): ###
+###################
+# running = true
+# while running = true:
+#   operation = user input add stock, remove stock, or check stock
+#   if the operation is add:
+#       Run code to add stock
+#       alterStock(Add => True)
+#   else if the operation is remove:
+#       run code to remove stock
+#       alterStock(Add => False)
+#   else if the operation is check:
+#       run code to check stock
+#       checkStock()
+#   else if operation is not recognised
+#       Prompt user to pick from the three options
+#       continue;
+#   Ask if the user would like to perform another operation
+#   if not, break;
