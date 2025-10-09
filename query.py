@@ -32,6 +32,7 @@ class TransactionType(Enum):
 class BaseQuery(ABC):
     def __init__(self):
         self.__valid = False
+        self.__query = ""
         self.__queryAdded = False
 
 # These functions are declared here as virtual functions to ensure that they
@@ -111,8 +112,6 @@ class AddQuery(BaseQuery):
     def updateDatabase(self):
         raise NotImplementedError("AddQuery.updateDatabase not implemented")
 
-    
-
 
 #######################
 ## class RemoveQuery ##
@@ -150,13 +149,24 @@ class RemoveQuery(BaseQuery):
         raise NotImplementedError("RemoveQuery.updateDatabase not implemented")
 
 
+######################
+## class CheckQuery ##
+######################
+# Abstract class used to add the outputToCSV method to the 3 (as of 9/10/25)
+# xCheckQuery classes
+class CheckQuery(BaseQuery):
+    @abstractmethod
+    def outputToCSV(self):
+        pass
+
+
 #################################
 ## class TransactionCheckQuery ##
 #################################
 # Class used to get information about specific transations
-class TransactionCheckQuery(BaseQuery):
+class TransactionCheckQuery(CheckQuery):
     def __init__(self):
-        super().__init__
+        BaseQuery.__init__(self)
         self.__transactionType = TransactionType.ADD
         self.__batchNumber = -1
         self.__batchNumberValid = False
@@ -181,6 +191,9 @@ class TransactionCheckQuery(BaseQuery):
 
     def updateDatabase(self):
         raise NotImplementedError("TransactionCheckQuery.updateDatabase not implemented")
+    
+    def outputToCSV(self):
+        raise NotImplementedError("TransactionCheckQuery.outputToCSV not implemented")
 
 
 ###########################
@@ -188,10 +201,9 @@ class TransactionCheckQuery(BaseQuery):
 ###########################
 # Class used to get information about specific batches, or to get a batch
 # number.
-class BatchCheckQuery(BaseQuery):
+class BatchCheckQuery(CheckQuery):
     def __init__(self):
-        super().__init__
-
+        BaseQuery.__init__(self)
         self.__batchNumber = -1
         self.__batchNumberValid = False
         self.__stockName = ""
@@ -213,14 +225,17 @@ class BatchCheckQuery(BaseQuery):
 
     def updateDatabase(self):
         raise NotImplementedError("BatchCheckQuery.updateDatabase not implemented")
+    
+    def outputToCSV(self):
+        raise NotImplementedError("BatchCheckQuery.outputToCSV not implemented")
 
 ###########################
 ## class StockCheckQuery ##
 ###########################
 # Class used to get information about stock at various points in time.
-class StockCheckQuery(BaseQuery):
+class StockCheckQuery(CheckQuery):
     def __init__(self):
-        super().__init__
+        BaseQuery.__init__(self)
         self.__allStock = False
         self.__stockList = [""]
         self.__stockListValid = False
@@ -241,3 +256,6 @@ class StockCheckQuery(BaseQuery):
 
     def updateDatabase(self):
         raise NotImplementedError("StockCheckQuery.updateDatabase not implemented")
+    
+    def outputToCSV(self):
+        raise NotImplementedError("StockCheckQuery.outputToCSV not implemented")
