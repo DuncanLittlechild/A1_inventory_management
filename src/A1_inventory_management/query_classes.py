@@ -218,13 +218,14 @@ class AddQuery(BaseQuery):
         if not self.__nameValid:
             nameInvalidLabel = ttk.Label(window, text="Name was invalid. Ensure that name is present in the database and check spelling").pack()
         if not self.__batchNumberValid and batchNumberUsed:
-            batchNumberInvalidLabel = ttk.Label(window, text="Batch Number was invalid. If not using, set to zero, or ensure that batch number is present in the database and check spelling").pack()
+            batchNumberInvalidLabel = ttk.Label(window, text="Batch Number was invalid. If not using, set to zero, or ensure that batch number is present in the database").pack()
         if not self.__quantityValid:
             quantityInvalidLabel = ttk.Label(window, text="Quantity is invalid. Ensure that it is a positive whole number").pack()
         if not self.__deliveryDateValid:
             deliveryDateInvalidLabel = ttk.Label(window, text="Delivery date was invalid. Ensure that it is in the form YYYY-MM-DD, that it is a possible date, and that it is not in the future").pack()
         if not self.__useByDateValid:
             useByDateInvalidLabel = ttk.Label(window, text="Use by date was invalid. Ensure that it is in the form YYYY-MM-DD, that it is a possible date, and that it is in the future").pack()
+        return
 
     def constructQuery(self):
         raise NotImplementedError("AddQuery.constructQuery not implemented")

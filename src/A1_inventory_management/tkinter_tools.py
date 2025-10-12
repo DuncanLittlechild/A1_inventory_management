@@ -1,4 +1,5 @@
 import tkinter as tk
+from tkinter import ttk
 
 def resizeAndCentreWindow(width, height, window):
     # Get screen height and width
