@@ -1,4 +1,22 @@
-# If databases don't exist, initialise them
+import tkinter as tk
+import sqlite3 as sql
+from pathlib import Path
+
+
+#########################
+## def initialiseDb () ##
+#########################
+# If databases don't exist, initialise them from the db_sqlite_code file
+def initialiseDb():
+    path = Path(__file__).parent / "./dbs/db_sqlite_code.sql"
+    conn = sql.connect("dbs/stock_database.db")
+    sqlScript = ""
+    with open(path) as f:
+        sqlScript = f.read()
+    cursor = conn.cursor()
+    cursor.executescript(sqlScript)
+    conn.commit()
+    conn.close()
 
 #################################
 ## def alterStock (Add : bool) ##
@@ -60,12 +78,12 @@
 
 ###################
 ## MAIN FUNCTION ##
-### def main(): ###
 ###################
-# running = true
-# root = TKinter main widget
-
-
+def runProgram():
+    running = True
+    root = tk.Tk()
+    initialiseDb()
+    print("Hello world!")
 # while running = true:
 #   operation = user input add stock, remove stock, or check stock
 #   if the operation is add:
