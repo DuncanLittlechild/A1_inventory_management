@@ -6,6 +6,7 @@ from abc import ABC, abstractmethod
 from enum import Enum
 import tkinter as tk
 
+
 ########################
 ## enum RemovalReason ##
 ########################
@@ -261,3 +262,5 @@ class StockCheckQuery(CheckQuery):
     
     def outputToCSV(self):
         raise NotImplementedError("StockCheckQuery.outputToCSV not implemented")
+    
+    

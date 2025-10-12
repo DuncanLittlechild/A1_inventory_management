@@ -1,7 +1,16 @@
 import tkinter as tk
+from tkinter import ttk
 import sqlite3 as sql
 from pathlib import Path
 
+import A1_inventory_management.utils.tkinter_tools as tk_tools
+import A1_inventory_management.utils.query_classes_dict as qcd
+
+MAIN_WINDOW_WIDTH_G  = 600
+MAIN_WINDOW_HEIGHT_G = 300
+ # Start to set up Tkinter window
+ROOT_G = tk.Tk()
+tk_tools.resizeAndCentreWindow(MAIN_WINDOW_WIDTH_G, MAIN_WINDOW_HEIGHT_G, ROOT_G)
 
 #########################
 ## def initialiseDb () ##
@@ -21,12 +30,15 @@ def initialiseDb():
 #################################
 ## def alterStock (Add : bool) ##
 #################################
-# initialise query to null
-# if Add:
-#   query = AddQuery()
-# else:
-#   query = RemoveQuery()
-
+# Displays option and creates object to allow user to either add or remove 
+# stock.
+def alterStock(add):
+    print(f"alterStock called with add at {add}")
+    query = None
+    if add:
+        query = qcd.alterStockClassesList["add"]()
+    else:
+        query = qcd.alterStockClassesList["remove"]()
 ## Initial input and validation ##
 
 # while not query.Valid:
@@ -52,6 +64,8 @@ def initialiseDb():
 ######################
 ## def checkStock() ##
 ######################
+def checkStock():
+    print("checkStock called")
 
 # initialise query to null
 # Ask to choose between querying a batch; querying transactions; or querying total stock levels
@@ -76,27 +90,21 @@ def initialiseDb():
 
 
 
-###################
-## MAIN FUNCTION ##
-###################
-def runProgram():
-    running = True
-    root = tk.Tk()
-    initialiseDb()
-    print("Hello world!")
-# while running = true:
-#   operation = user input add stock, remove stock, or check stock
-#   if the operation is add:
-#       Run code to add stock
-#       alterStock(Add => True)
-#   else if the operation is remove:
-#       run code to remove stock
-#       alterStock(Add => False)
-#   else if the operation is check:
-#       run code to check stock
-#       checkStock()
-#   else if operation is not recognised
-#       Prompt user to pick from the three options
-#       continue;
-#   Ask if the user would like to perform another operation
-#   if not, break;
+###########################
+## displayInitialOptions ##
+###########################
+# Gives the option to choose the initial operation the user wants to perform
+def displayInitialOptions():
+    tk_tools.clearWindow(ROOT_G)
+    # set up Tkinter window
+    ROOT_G.title('Choose database operation')
+    # Currently just basic options for appreance, nothing fancy
+    # Add buttons and labels to add, remove, or check stock
+    optionsLabel = ttk.Label(ROOT_G, text="What would you like to do today?").pack()
+    addStockButton = ttk.Button(ROOT_G, text="Add stock", command=lambda: alterStock(True)).pack()
+    removeStockButton = ttk.Button(ROOT_G, text="Remove stock", command=lambda: alterStock(False)).pack()
+    checkStockButton = ttk.Button(ROOT_G, text="Check stock", command=checkStock).pack()
+    # Add exit button
+    exitButton = ttk.Button(ROOT_G, text="exit", command=ROOT_G.destroy).pack()
+    # display
+    ROOT_G.mainloop()
