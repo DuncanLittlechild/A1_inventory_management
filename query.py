@@ -4,6 +4,7 @@
 # See the UML diagram for a clearer picture of their relationship to each other
 from abc import ABC, abstractmethod
 from enum import Enum
+import tkinter as tk
 
 ########################
 ## enum RemovalReason ##
@@ -34,6 +35,7 @@ class BaseQuery(ABC):
         self.__valid = False
         self.__query = ""
         self.__queryAdded = False
+        self.__window = tk.Tk()
 
 # These functions are declared here as virtual functions to ensure that they
 # are implemented by all children, to ensure that this basic functionality is
@@ -89,9 +91,9 @@ class AddQuery(BaseQuery):
         self.__nameValid = False
         self.__quantity = -1
         self.__quantityValid = False
-        self.__deliveryDate = -1
+        self.__deliveryDate = ""
         self.__deliveryDateValid = False
-        self.__useByDate = -1
+        self.__useByDate = ""
         self.__useByDateValid = False
         self.__batchNumber = -1
         self.__batchNumberValid = False
@@ -127,7 +129,7 @@ class RemoveQuery(BaseQuery):
         self.__batchNumberValid = False
         self.__quantity = -1
         self.__quantityValid = False
-        self.__removalDate = -1
+        self.__removalDate = ""
         self.__removalDateValid = False
         self.__removalReason = RemovalReason.USED
         self.__removalReasonValid = False
@@ -172,7 +174,7 @@ class TransactionCheckQuery(CheckQuery):
         self.__batchNumberValid = False
         self.__stockName = ""
         self.__stockNameValid = False
-        self.__dateRange = [-1, -1]
+        self.__dateRange = ["", ""]
         self.__dateRangeValid = False
         self.__removalReason = RemovalReason.USED
         self.__removalReasonValid = False
@@ -208,7 +210,7 @@ class BatchCheckQuery(CheckQuery):
         self.__batchNumberValid = False
         self.__stockName = ""
         self.__stockNameValid = False
-        self.__dateRange = [-1, -1]
+        self.__dateRange = ["", ""]
         self.__dateRangeValid = False
 
     def displayOptions(self):
@@ -239,7 +241,7 @@ class StockCheckQuery(CheckQuery):
         self.__allStock = False
         self.__stockList = [""]
         self.__stockListValid = False
-        self.__atDate = -1
+        self.__atDate = ""
         self.__atDateValid = False
 
     def displayOptions(self):

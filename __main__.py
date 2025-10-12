@@ -1,11 +1,5 @@
 # If databases don't exist, initialise them
 
-# A global Tkinter widget is being used here because there is no point in the
-# program when a widget should not be on screen, and all operations rely on
-# morphing the same widget. Global variables would ideally be const, but that
-# is obviously not possible here
-# widget = global Tkinter widget
-
 #################################
 ## def alterStock (Add : bool) ##
 #################################
@@ -69,6 +63,9 @@
 ### def main(): ###
 ###################
 # running = true
+# root = TKinter main widget
+
+
 # while running = true:
 #   operation = user input add stock, remove stock, or check stock
 #   if the operation is add:
