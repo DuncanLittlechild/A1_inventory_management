@@ -11,3 +11,4 @@ src/A1_inventory_management.egg-info/top_level.txt
 src/A1_inventory_management/utils/__init__.py
 src/A1_inventory_management/utils/query_classes_dict.py
 src/A1_inventory_management/utils/tkinter_tools.py
+tests/test.py

@@ -5,12 +5,6 @@
 from abc import ABC, abstractmethod
 from enum import Enum
 import tkinter as tk
-from tkinter import ttk
-import sqlite3 as sql
-
-
-from A1_inventory_management.utils.tkinter_tools import clearWindow
-from A1_inventory_management.utils.query_classes_valid import isDate, dateInFuture
 
 
 ########################
@@ -39,7 +33,7 @@ class TransactionType(Enum):
 # This class creates the template that the other Query classes must follow
 class BaseQuery(ABC):
     def __init__(self):
-        self.valid = False
+        self.__valid = False
         self.__query = ""
         self.__queryAdded = False
         self.__window = tk.Tk()
@@ -51,7 +45,7 @@ class BaseQuery(ABC):
 # displayOptions alters the Tkiter widget to display the options that the user
 # has to fine tune the query they want to run
     @abstractmethod
-    def displayOptions(self, window):
+    def displayOptions(self):
         pass
 
 # checkValid checks each member variable __x that has a __xValid flag
@@ -93,7 +87,7 @@ class BaseQuery(ABC):
 # or incorrectly entered inventory.
 class AddQuery(BaseQuery):
     def __init__(self):
-        super().__init__()
+        super().__init__
         self.__name = ""
         self.__nameValid = False
         self.__quantity = -1
@@ -106,126 +100,15 @@ class AddQuery(BaseQuery):
         self.__batchNumberValid = False
 
 
-    def displayOptions(self, window):
-        clearWindow(window)
-        # Allow users to enter the relevant details about the stock to be added
-        window.title('Enter data about new stock')
+    def displayOptions(self):
+        raise NotImplementedError("AddQuery.displayOptions not implemented")
 
-        nameLabel = ttk.Label(window, text="Name of Good").pack()
-        nameVar = tk.StringVar()
-        nameEntry = ttk.Entry(window, textvariable=nameVar).pack()
-
-        batchNumberLabel = ttk.Label(window, text="Batch Number(optional, only for adding missed goods to existing batch)").pack()
-        batchNumberVar = tk.StringVar()
-        batchNumberEntry = ttk.Entry(window, textvariable=batchNumberVar).pack()
-
-        quantityLabel = ttk.Label(window, text="Quantity of good").pack()
-        quantityVar = tk.IntVar()
-        quantityEntry = ttk.Entry(window, textvariable=quantityVar).pack()
-
-        deliveryDateLabel = ttk.Label(window, text="Delivery Date (YYYY-MM-DD)").pack()
-        deliveryDateVar = tk.StringVar()
-        deliveryDateEntry = ttk.Entry(window, textvariable=deliveryDateVar).pack()
-
-        useByDateLabel = ttk.Label(window, text="Use By Date (YYYY-MM-DD)").pack()
-        useByDateVar = tk.StringVar()
-        useByDateEntry = ttk.Entry(window, textvariable=useByDateVar).pack()
-
-
-        # On submission, check to make sure all values are valid before adding them to the object.
-        submitButton = ttk.Button(window, text="Submit details", command=lambda: self.checkValid(nameVar.get(), quantityVar.get(), deliveryDateVar.get(), useByDateVar.get(), batchNumberVar.get(), window)).pack()
-
-    def checkValid(self, nameVar, quantityVar, deliveryDateVar, useByDateVar, batchNumberVar, window):
-        # check name is valid by running a quick sqlite query
-        conn = sql.connect("dbs/stock_database.db")
-        cur = conn.cursor()
-        cur.execute('SELECT name FROM stock_names WHERE name = ?', (nameVar.lower(),))
-        if len(cur.fetchall()) > 0:
-            self.__name = nameVar.lower()
-            self.__nameValid = True
-            print("name valid")
-        else:
-            print("name not valid")
-            self.__nameValid = False
-            self.valid = False
-
-         # If they have set the batch number to anything, then check to see that it exists in the database
-         # This is placed here so the connection can be closed as soon as possible
-         # batchNumberUsed is used to tell displayInvalid if the batchNumber was used
-        batchNumberUsed = False
-        if batchNumberVar != 0:
-            batchNumberUsed = True
-            cur.execute('SELECT id FROM batches WHERE id = ?', (batchNumberVar,))
-            if len(cur.fetchall()) > 0:
-                self.__batchNumber = batchNumberVar
-                self.__batchNumberValid = True
-                print("Batch number valid")
-            else:
-                print("batch number not valid")
-                self.__batchNumberValid = False
-                self.valid = False
-        conn.close()
-        
-        # Ensure that quantity is an integer and is greater than 0
-        # IntVar objects reset their value to 0 if a non-integer is entered, 
-        # so this test checks both parameters
-        if quantityVar > 0:
-            self.__quantity = quantityVar
-            self.__quantityValid = True
-            print("quantity valid")
-        else:
-            print("quantity not valid")
-            self.__quantityValid = False
-            self.valid = False
-
-        # Ensure that the delivery date is formatted correctly (yyyy-mm-dd), 
-        # that all parts are possible (eg, no 13th month), and that it is not in 
-        # the future
-        if isDate(deliveryDateVar) and not dateInFuture(deliveryDateVar):
-            self.__deliveryDate = deliveryDateVar
-            self.__deliveryDateValid = True
-            print("delivery date valid")
-        else:
-            print("delivery date not valid")
-            self.__deliveryDateValid = False
-            self.valid = False
-
-        # Ensure that the use by date is formatted correctly (yyyy-mm-dd),
-        # that all parts are possible (eg, no 13th month), and that it is in 
-        # the future
-        if isDate(useByDateVar) and dateInFuture(useByDateVar):
-            self.__useByDate = deliveryDateVar
-            self.__useByDateValid = True
-            print("use by date valid")
-        else:
-            print("use by date not valid")
-            self.__deliveryDateValid = False
-            self.valid = False
-
-        if not self.valid:
-            self.displayInvalid(window, batchNumberUsed)
-
-        
-
-    def displayInvalid(self, window, batchNumberUsed):
-        clearWindow(window)
-        invalidLabel = ttk.Label(window, text="You entered invalid data").pack()
-        nameInvalidLabel = None
-        batchNumberInvalidLabel = None
-        quantityInvalidLabel = None
-        deliveryDateInvalidLabel = None
-        useByDateInvalidLabel = None
-        if not self.__nameValid:
-            nameInvalidLabel = ttk.Label(window, text="Name was invalid. Ensure that name is present in the database and check spelling").pack()
-        if not self.__batchNumberValid and batchNumberUsed:
-            batchNumberInvalidLabel = ttk.Label(window, text="Batch Number was invalid. If not using, set to zero, or ensure that batch number is present in the database and check spelling").pack()
-        if not self.__quantityValid:
-            quantityInvalidLabel = ttk.Label(window, text="Quantity is invalid. Ensure that it is a positive whole number").pack()
-        if not self.__deliveryDateValid:
-            deliveryDateInvalidLabel = ttk.Label(window, text="Delivery date was invalid. Ensure that it is in the form YYYY-MM-DD, that it is a possible date, and that it is not in the future").pack()
-        if not self.__useByDateValid:
-            useByDateInvalidLabel = ttk.Label(window, text="Use by date was invalid. Ensure that it is in the form YYYY-MM-DD, that it is a possible date, and that it is in the future").pack()
-
+    def checkValid(self):
+        raise NotImplementedError("AddQuery.checkValid not implemented")
+    
+    def displayInvalid(self):
+        raise NotImplementedError("AddQuery.displayInvalid not implemented")
+    
     def constructQuery(self):
         raise NotImplementedError("AddQuery.constructQuery not implemented")
 
@@ -242,7 +125,7 @@ class AddQuery(BaseQuery):
 # a planned feature to add in subsequent updates.
 class RemoveQuery(BaseQuery):
     def __init__(self):
-        super().__init__()
+        super().__init__
         self.__batchNumber = -1
         self.__batchNumberValid = False
         self.__quantity = -1
@@ -253,7 +136,7 @@ class RemoveQuery(BaseQuery):
         self.__removalReasonValid = False
 
 
-    def displayOptions(self, window):
+    def displayOptions(self):
         raise NotImplementedError("RemoveQuery.displayOptions not implemented")
 
     def checkValid(self):
@@ -297,7 +180,7 @@ class TransactionCheckQuery(CheckQuery):
         self.__removalReason = RemovalReason.USED
         self.__removalReasonValid = False
 
-    def displayOptions(self, window):
+    def displayOptions(self):
         raise NotImplementedError("TransactionCheckQuery.displayOptions not implemented")
 
     def checkValid(self):
@@ -331,7 +214,7 @@ class BatchCheckQuery(CheckQuery):
         self.__dateRange = ["", ""]
         self.__dateRangeValid = False
 
-    def displayOptions(self, window):
+    def displayOptions(self):
         raise NotImplementedError("BatchCheckQuery.displayOptions not implemented")
 
     def checkValid(self):
@@ -362,7 +245,7 @@ class StockCheckQuery(CheckQuery):
         self.__atDate = ""
         self.__atDateValid = False
 
-    def displayOptions(self, window):
+    def displayOptions(self):
         raise NotImplementedError("StockCheckQuery.displayOptions not implemented")
 
     def checkValid(self):

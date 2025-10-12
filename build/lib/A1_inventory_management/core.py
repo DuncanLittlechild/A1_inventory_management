@@ -6,12 +6,11 @@ from pathlib import Path
 import A1_inventory_management.utils.tkinter_tools as tk_tools
 import A1_inventory_management.utils.query_classes_dict as qcd
 
-
 MAIN_WINDOW_WIDTH_G  = 600
 MAIN_WINDOW_HEIGHT_G = 300
  # Start to set up Tkinter window
-root = tk.Tk()
-tk_tools.resizeAndCentreWindow(MAIN_WINDOW_WIDTH_G, MAIN_WINDOW_HEIGHT_G, root)
+ROOT_G = tk.Tk()
+tk_tools.resizeAndCentreWindow(MAIN_WINDOW_WIDTH_G, MAIN_WINDOW_HEIGHT_G, ROOT_G)
 
 #########################
 ## def initialiseDb () ##
@@ -31,13 +30,15 @@ def initialiseDb():
 #################################
 ## def alterStock (Add : bool) ##
 #################################
-# Program branch for any operations that involve altering the contents of the 
-# database
-def alterStock(query):
-    if not query.valid:
-        print(f"alterStock called with query at {type(query)}")
-        value = query.displayOptions(root)
-
+# Displays option and creates object to allow user to either add or remove 
+# stock.
+def alterStock(add):
+    print(f"alterStock called with add at {add}")
+    query = None
+    if add:
+        query = qcd.alterStockClassesList["add"]()
+    else:
+        query = qcd.alterStockClassesList["remove"]()
 ## Initial input and validation ##
 
 # while not query.Valid:
@@ -61,12 +62,10 @@ def alterStock(query):
 
 
 ######################
-## def checkStockChoice() ##
+## def checkStock() ##
 ######################
-# program branch for any operations that do not involve altering the contents 
-# of the database
-def checkStockChoice():
-    pass
+def checkStock():
+    print("checkStock called")
 
 # initialise query to null
 # Ask to choose between querying a batch; querying transactions; or querying total stock levels
@@ -96,18 +95,16 @@ def checkStockChoice():
 ###########################
 # Gives the option to choose the initial operation the user wants to perform
 def displayInitialOptions():
-    tk_tools.clearWindow(root)
+    tk_tools.clearWindow(ROOT_G)
     # set up Tkinter window
-    root.title('Choose database operation')
+    ROOT_G.title('Choose database operation')
     # Currently just basic options for appreance, nothing fancy
     # Add buttons and labels to add, remove, or check stock
-    optionsLabel = ttk.Label(root, text="What would you like to do today?").pack()
-
-    addStockButton = ttk.Button(root, text=f"Add Stock", command=lambda: alterStock(qcd.alterStockClassesList["add"]())).pack()
-    removeStockButton = ttk.Button(root, text=f"Remove Stock", command=lambda: alterStock(qcd.alterStockClassesList["remove"]())).pack()
-
-    checkStockButton = ttk.Button(root, text=f"Check Stock", command=lambda: checkStockChoice()).pack()
+    optionsLabel = ttk.Label(ROOT_G, text="What would you like to do today?").pack()
+    addStockButton = ttk.Button(ROOT_G, text="Add stock", command=lambda: alterStock(True)).pack()
+    removeStockButton = ttk.Button(ROOT_G, text="Remove stock", command=lambda: alterStock(False)).pack()
+    checkStockButton = ttk.Button(ROOT_G, text="Check stock", command=checkStock).pack()
     # Add exit button
-    exitButton = ttk.Button(root, text="exit", command=root.destroy).pack()
+    exitButton = ttk.Button(ROOT_G, text="exit", command=ROOT_G.destroy).pack()
     # display
-    root.mainloop()
+    ROOT_G.mainloop()
