@@ -33,6 +33,207 @@ class TransactionType(Enum):
     REMOVE = 1
     BOTH   = 2
 
+
+###############
+## class App ##
+###############
+class App(tk.Tk):
+    def __init__(self):
+        super().__init__()
+        self.title("Fylde Aero inventory mangement")
+        # Get screen height and width
+        screenWidth = self.winfo_screenwidth()
+        screenHeight = self.winfo_screenheight()
+        
+        # set height and width
+        width = 600
+        height = 400
+        
+        #find the offsets needed to centre the window
+        offsetX = int(screenWidth/2 - width / 2)
+        offsetY = int(screenHeight / 2 - height / 2)
+    
+        # Set the window to the centre of the screen
+        self.geometry(f'{width}x{height}+{offsetX}+{offsetY}')
+
+        # Create container for active frames
+        self.container = ttk.Frame(self)
+        self.container.pack(fill="both", expand="true")
+
+        # Datafield to contain the fulfilled, returned query
+        self.data = {
+            "query" : ""
+        }
+
+        self.showFrame(MainPage)
+        
+    # Method to display a new frame of a set class
+    def showFrame(self, frameClass):
+        # Clear the current frame from the container
+        for widgets in self.container.winfo_children():
+            widget.destroy()
+        # create a new frame attached to the container
+        frame = frameClass(self.container, self)
+        # display the new frame
+        frame.pack(fill="both", expand="true")
+
+####################
+## class MainPage ##
+####################
+# Basic initial frame to display the page where the query is chosen
+class MainPage(ttk.Frame):
+    def __init__(self, parent, controller):
+        super().__init__(parent)
+        self.controller = controller
+        # Labels and options to perform different queries
+        self.optionsLabel = ttk.Label(root, text="What would you like to do today?").pack()
+    
+        self.addStockButton = ttk.Button(root, text=f"Add Stock", command=lambda: self.controller.showFrame(AddPage)).pack()
+        self.removeStockButton = ttk.Button(root, text=f"Remove Stock", command=lambda: self.controller.showFrame(RemovePage)).pack()
+    
+        self.checkStockButton = ttk.Button(root, text=f"Check Batches", command=lambda: self.controller.showFrame(CheckBatchPage)).pack()
+        self.checkStockButton = ttk.Button(root, text=f"Check Transactions", command=lambda: self.controller.showFrame(CheckTransactionPage)).pack()
+        self.checkStockButton = ttk.Button(root, text=f"Check Total Stock", command=lambda: self.controller.showFrame(CheckStockPage)).pack()
+        # Exit button
+        self.exitButton = ttk.Button(root, text="exit", command=root.destroy).pack()
+
+###################
+## class AddPage ##
+###################
+# Frame to display data to construct a query to add data to a sqlite database
+class AddPage(ttk.Frame):
+    def __init__(self, parent, controller):
+        super().__init__(parent)
+        self.controller = controller
+        # Datafields required for a query to add data
+        self.data = {
+            "name" = tk.StringVar()
+            "quantity" = tk.IntVar()
+            "deliveryDate" = tk.StringVar()
+            "useByDate" = tk.StringVar()
+            "batchNumber" = tk.IntVar()
+        }
+        self.dataValid = {
+            "name" = None
+            "quantity" = None
+            "deliveryDate" = None
+            "useByDate" = None
+            "batchNumber" = None
+        }
+        # name datafields
+        self.nameLabel = ttk.Label(self, text="Name of Good").pack()
+        self.nameEntry = ttk.Entry(self, textvariable=self.data["name"]).pack()
+        self.nameEntryInvalid = ttk.Label(self, text="").pack()
+
+        # batchNumber Datafields
+        self.batchNumberLabel = ttk.Label(self, text="Batch Number(optional)").pack()
+        self.batchNumberEntry = ttk.Entry(self, textvariable=self.data["batchNumber"]).pack()
+        self.batchNumberEntryInvalid = ttk.Label(self, text="").pack()
+
+        # quantity Datafields
+        self.quantityLabel = ttk.Label(self, text="Quantity of good").pack()
+        self.quantityEntry = ttk.Entry(self, textvariable=self.data["quantity"]).pack()
+        self.quantityEntryInvalid = ttk.Label(self, text="").pack()
+
+        # deliveryDate Datafields
+        self.deliveryDateLabel = ttk.Label(self, text="Delivery Date (YYYY-MM-DD)").pack()
+        self.deliveryDateEntry = ttk.Entry(self, textvariable=self.data["deliveryDate"]).pack()
+        self.deliveryDateEntryInvalid = ttk.Label(self, text="").pack()
+
+        # useByDate Datafields
+        self.useByDateLabel = ttk.Label(self, text="Use By Date (YYYY-MM-DD)").pack()
+        self.useByDateEntry = ttk.Entry(self, textvariable=self.data["useByDate"]).pack()
+        self.useByDateEntryInvalid = ttk.Label(self, text="").pack()
+
+        # On submission, check to make sure all values are valid before adding them to the object.
+        self.submitButton = ttk.Button(window, text="Submit details", command= self.checkValid()).pack()
+
+    # make sure that values entered are all valid
+    def checkValid(self):
+        # use flag to see if any data are incorrectly formatted
+        allValid = True
+        # check name is valid by running a quick sqlite query
+        conn = sql.connect("dbs/stock_database.db")
+        cur = conn.cursor()
+        cur.execute('SELECT name FROM stock_names WHERE name = ?', (self.data["name"].get().lower(),))
+        if len(cur.fetchall()) > 0:
+            self.dataValid["name"] = True
+        else:
+            self.dataValid["name"] = False
+            allValid = False
+
+         # If they have set the batch number to anything, then check to see that it exists in the database
+         # This is placed here so the connection can be closed as soon as possible
+         # batchNumberUsed is used to tell displayInvalid if the batchNumber was used
+        batchNumberUsed = False
+        if batchNumberVar != 0:
+            batchNumberUsed = True
+            cur.execute('SELECT id FROM batches WHERE id = ?', (self.data["batchNumber"].get(),))
+            if len(cur.fetchall()) > 0:
+                self.dataValid["batchNumber"] = True
+            else:
+                self.dataValid["batchNumber"] = False
+                allValid = False
+        conn.close()
+        
+        # Ensure that quantity is an integer and is greater than 0
+        # IntVar objects reset their value to 0 if a non-integer is entered, 
+        # so this test checks both parameters
+        if self.data["quantity"].get() > 0:
+            self.dataValid["quantity"] = True
+        else:
+            self.dataValid["quantity"] = False
+            allValid = False
+
+        # Ensure that the delivery date is formatted correctly (yyyy-mm-dd), 
+        # that all parts are possible (eg, no 13th month), and that it is not in 
+        # the future
+        if isDate(self.data["deliveryDate"].get()) and not dateInFuture(self.data["deliveryDate"].get()):
+            self.dataValid["deliveryDate"] = True
+        else:
+            self.dataValid["deliveryDate"] = False
+            allValid = False
+
+        # Ensure that the use by date is formatted correctly (yyyy-mm-dd),
+        # that all parts are possible (eg, no 13th month), and that it is in 
+        # the future
+        if isDate(self.data["useByDate"].get()) and dateInFuture(self.data["useByDate"].get()):
+            self.dataValid["useByDate"] = True
+        else:
+            self.dataValid["useByDate"] = False
+            allValid = False
+
+        if allValid:
+            self.submitQuery(batchNumberUsed)
+            self.controller.showFrame(ResultsPage)
+        else:
+            self.displayInvalid(batchNumberUsed)
+
+    # Display error messages for incorrectly entered datafields
+    def displayInvalid(self, batchNumberUsed):
+        if not self.dataValid["name"]:
+            self.nameEntryInvalid.config(text="Name was invalid. Ensure that name is present in the database and check spelling")
+        if not self.dataValid["batchNumber"] and batchNumberUsed:
+            self.batchNumberEntryInvalid.config(text="Batch Number was invalid. If not using, set to zero, or ensure that batch number is present in the database")
+        if not self.dataValid["quantity"]:
+            self.quantityEntryInvalid(text="Quantity is invalid. Ensure that it is a positive whole number")
+        if not self.dataValid["deliveryDate"]:
+            self.deliveryDateEntryInvalid.config(text="Delivery date was invalid. Ensure that it is in the form YYYY-MM-DD, that it is a possible date, and that it is not in the future")
+        if not self.dataValid["useByDate"]:
+            self.useByDateInvalid.config(text="Use by date was invalid. Ensure that it is in the form YYYY-MM-DD, that it is a possible date, and that it is in the future")
+
+    # construct and submit a query to the database
+    def submitQuery(self, batchNumberUsed):
+        conn = sql.connect("dbs/stock_database.db")
+        cur = conn.cursor()
+        if batchNumberUsed is True:
+            # get current quantity
+            # update quantity
+        else:
+            cursor.execute("INSERT INTO batches (name, 
+
+    
+
 #####################
 ## class BaseQuery ##
 #####################
@@ -85,154 +286,6 @@ class BaseQuery(ABC):
 
 
 ####################
-## class AddQuery ##
-####################
-# Class used to add new batches, or to increase the quantity recorded in a
-# batch.
-# The ability to increase quantity in a batch was added to account for lost 
-# or incorrectly entered inventory.
-class AddQuery(BaseQuery):
-    def __init__(self):
-        super().__init__()
-        self.__name = ""
-        self.__nameValid = False
-        self.__quantity = -1
-        self.__quantityValid = False
-        self.__deliveryDate = ""
-        self.__deliveryDateValid = False
-        self.__useByDate = ""
-        self.__useByDateValid = False
-        self.__batchNumber = -1
-        self.__batchNumberValid = False
-
-
-    def displayOptions(self, window):
-        clearWindow(window)
-        # Allow users to enter the relevant details about the stock to be added
-        window.title('Enter data about new stock')
-
-        nameLabel = ttk.Label(window, text="Name of Good").pack()
-        nameVar = tk.StringVar()
-        nameEntry = ttk.Entry(window, textvariable=nameVar).pack()
-
-        batchNumberLabel = ttk.Label(window, text="Batch Number(optional, only for adding missed goods to existing batch)").pack()
-        batchNumberVar = tk.StringVar()
-        batchNumberEntry = ttk.Entry(window, textvariable=batchNumberVar).pack()
-
-        quantityLabel = ttk.Label(window, text="Quantity of good").pack()
-        quantityVar = tk.IntVar()
-        quantityEntry = ttk.Entry(window, textvariable=quantityVar).pack()
-
-        deliveryDateLabel = ttk.Label(window, text="Delivery Date (YYYY-MM-DD)").pack()
-        deliveryDateVar = tk.StringVar()
-        deliveryDateEntry = ttk.Entry(window, textvariable=deliveryDateVar).pack()
-
-        useByDateLabel = ttk.Label(window, text="Use By Date (YYYY-MM-DD)").pack()
-        useByDateVar = tk.StringVar()
-        useByDateEntry = ttk.Entry(window, textvariable=useByDateVar).pack()
-
-
-        # On submission, check to make sure all values are valid before adding them to the object.
-        submitButton = ttk.Button(window, text="Submit details", command=lambda: self.checkValid(nameVar.get(), quantityVar.get(), deliveryDateVar.get(), useByDateVar.get(), batchNumberVar.get(), window)).pack()
-
-    def checkValid(self, nameVar, quantityVar, deliveryDateVar, useByDateVar, batchNumberVar, window):
-        # check name is valid by running a quick sqlite query
-        conn = sql.connect("dbs/stock_database.db")
-        cur = conn.cursor()
-        cur.execute('SELECT name FROM stock_names WHERE name = ?', (nameVar.lower(),))
-        if len(cur.fetchall()) > 0:
-            self.__name = nameVar.lower()
-            self.__nameValid = True
-            print("name valid")
-        else:
-            print("name not valid")
-            self.__nameValid = False
-            self.valid = False
-
-         # If they have set the batch number to anything, then check to see that it exists in the database
-         # This is placed here so the connection can be closed as soon as possible
-         # batchNumberUsed is used to tell displayInvalid if the batchNumber was used
-        batchNumberUsed = False
-        if batchNumberVar != 0:
-            batchNumberUsed = True
-            cur.execute('SELECT id FROM batches WHERE id = ?', (batchNumberVar,))
-            if len(cur.fetchall()) > 0:
-                self.__batchNumber = batchNumberVar
-                self.__batchNumberValid = True
-                print("Batch number valid")
-            else:
-                print("batch number not valid")
-                self.__batchNumberValid = False
-                self.valid = False
-        conn.close()
-        
-        # Ensure that quantity is an integer and is greater than 0
-        # IntVar objects reset their value to 0 if a non-integer is entered, 
-        # so this test checks both parameters
-        if quantityVar > 0:
-            self.__quantity = quantityVar
-            self.__quantityValid = True
-            print("quantity valid")
-        else:
-            print("quantity not valid")
-            self.__quantityValid = False
-            self.valid = False
-
-        # Ensure that the delivery date is formatted correctly (yyyy-mm-dd), 
-        # that all parts are possible (eg, no 13th month), and that it is not in 
-        # the future
-        if isDate(deliveryDateVar) and not dateInFuture(deliveryDateVar):
-            self.__deliveryDate = deliveryDateVar
-            self.__deliveryDateValid = True
-            print("delivery date valid")
-        else:
-            print("delivery date not valid")
-            self.__deliveryDateValid = False
-            self.valid = False
-
-        # Ensure that the use by date is formatted correctly (yyyy-mm-dd),
-        # that all parts are possible (eg, no 13th month), and that it is in 
-        # the future
-        if isDate(useByDateVar) and dateInFuture(useByDateVar):
-            self.__useByDate = deliveryDateVar
-            self.__useByDateValid = True
-            print("use by date valid")
-        else:
-            print("use by date not valid")
-            self.__deliveryDateValid = False
-            self.valid = False
-
-        if not self.valid:
-            self.displayInvalid(window, batchNumberUsed)
-
-        
-
-    def displayInvalid(self, window, batchNumberUsed):
-        clearWindow(window)
-        invalidLabel = ttk.Label(window, text="You entered invalid data").pack()
-        nameInvalidLabel = None
-        batchNumberInvalidLabel = None
-        quantityInvalidLabel = None
-        deliveryDateInvalidLabel = None
-        useByDateInvalidLabel = None
-        if not self.__nameValid:
-            nameInvalidLabel = ttk.Label(window, text="Name was invalid. Ensure that name is present in the database and check spelling").pack()
-        if not self.__batchNumberValid and batchNumberUsed:
-            batchNumberInvalidLabel = ttk.Label(window, text="Batch Number was invalid. If not using, set to zero, or ensure that batch number is present in the database").pack()
-        if not self.__quantityValid:
-            quantityInvalidLabel = ttk.Label(window, text="Quantity is invalid. Ensure that it is a positive whole number").pack()
-        if not self.__deliveryDateValid:
-            deliveryDateInvalidLabel = ttk.Label(window, text="Delivery date was invalid. Ensure that it is in the form YYYY-MM-DD, that it is a possible date, and that it is not in the future").pack()
-        if not self.__useByDateValid:
-            useByDateInvalidLabel = ttk.Label(window, text="Use by date was invalid. Ensure that it is in the form YYYY-MM-DD, that it is a possible date, and that it is in the future").pack()
-        return
-
-    def constructQuery(self):
-        raise NotImplementedError("AddQuery.constructQuery not implemented")
-
-    def updateDatabase(self):
-        raise NotImplementedError("AddQuery.updateDatabase not implemented")
-
 
 #######################
 ## class RemoveQuery ##
