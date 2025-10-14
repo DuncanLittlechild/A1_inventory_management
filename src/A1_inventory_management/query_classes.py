@@ -59,14 +59,22 @@ class App(tk.Tk):
         self.container.pack(fill="both", expand="true")
 
         # Datafield to contain the fulfilled, returned query
-        self.data = {
-            "query" : ""
+        self.queryData = {
+            "type" : "",
+            "parameters" : {},
+            "result" : []
         }
 
         self.showFrame(MainPage)
         
     # Method to display a new frame of a set class
     def showFrame(self, frameClass):
+        """Remove a prior frame and display a new one of the class frameClass
+
+        Args:
+            frameClass (class <ttk.Frame>): the name of the class of the frame
+              to be instantiated
+        """        
         # Clear the current frame from the container
         for widget in self.container.winfo_children():
             widget.destroy()
@@ -100,6 +108,9 @@ class MainPage(ttk.Frame):
 ###################
 # Frame to display data to construct a query to add data to a sqlite database
 class AddPage(ttk.Frame):
+    """
+    Frame to add stock into the database.
+    """    
     def __init__(self, parent, controller):
         super().__init__(parent)
         self.controller = controller
@@ -109,7 +120,6 @@ class AddPage(ttk.Frame):
             "quantity" : tk.IntVar(),
             "deliveryDate" : tk.StringVar(),
             "useByDate" : tk.StringVar(),
-            "batchNumber" : tk.IntVar(),
         }
         # datafields to record if the respective variable field is valid
         self.dataValid = {
@@ -117,13 +127,11 @@ class AddPage(ttk.Frame):
             "quantity" : None,
             "deliveryDate" : None,
             "useByDate" : None,
-            "batchNumber" : None,
         }
 
         # Store for labels for each member of self.data
         self.labels = {
             "name": ttk.Label(self, text="Name of Good"),
-            "batchNumber": ttk.Label(self, text="Batch Number(optional)"),
             "quantity": ttk.Label(self, text="Quantity of good"),
             "deliveryDate": ttk.Label(self, text="Delivery Date (YYYY-MM-DD)"),
             "useByDate": ttk.Label(self, text="Use By Date (YYYY-MM-DD)")
@@ -131,7 +139,6 @@ class AddPage(ttk.Frame):
         # store for entries for each member of self.data
         self.entries = {
             "name": ttk.Entry(self, textvariable=self.data["name"]),
-            "batchNumber": ttk.Entry(self, textvariable=self.data["batchNumber"]),
             "quantity": ttk.Entry(self, textvariable=self.data["quantity"]),
             "deliveryDate": ttk.Entry(self, textvariable=self.data["deliveryDate"]),
             "useByDate": ttk.Entry(self, textvariable=self.data["useByDate"])
@@ -141,12 +148,11 @@ class AddPage(ttk.Frame):
         # contain invalid data
         self.entriesInvalid = {
             "name": ttk.Label(self, text=""),
-            "batchNumber": ttk.Label(self, text=""),
             "quantity": ttk.Label(self, text=""),
             "deliveryDate": ttk.Label(self, text=""),
             "useByDate": ttk.Label(self, text="")
         }
-        self.submitButton = ttk.Button(self, text="Submit details", command=self.checkValid)
+       
         # Loop to display labels, entries, and invalids
         # I chose to seperate them like this because each type of tkinter 
         # object may need to be displayed in their own style, and this allows 
@@ -156,35 +162,27 @@ class AddPage(ttk.Frame):
             self.entries[dataField].pack()
             self.entriesInvalid[dataField].pack()
 
-        self.submitButton.pack()
-
+        ttk.Button(self, text="Submit details", command=self.checkValid)
 
     # make sure that values entered are all valid
     def checkValid(self):
+        """
+        Check each value in self.data in turn to ensure that it conforms to the
+        syntax of the sql database, and mark it as invalid if it does not. If
+        all values are valid, then the query is submitted; otherwise, the 
+        invalid fields are flagged and the user is asked to re-enter that data.
+        """        
         # use flag to see if any data are incorrectly formatted
         allValid = True
         # check name is valid by running a quick sqlite query
         conn = sql.connect("dbs/stock_database.db")
         cur = conn.cursor()
-        cur.execute('SELECT name FROM stock_names WHERE name = ?', (self.data["name"].get().lower(),))
+        cur.execute('SELECT name FROM stock_names WHERE name = ?', (self.data["name"].get().upper(),))
         if len(cur.fetchall()) > 0:
             self.dataValid["name"] = True
         else:
             self.dataValid["name"] = False
             allValid = False
-
-         # If they have set the batch number to anything, then check to see that it exists in the database
-         # This is placed here so the connection can be closed as soon as possible
-         # batchNumberUsed is used to tell displayInvalid if the batchNumber was used
-        batchNumberUsed = False
-        if self.data["batchNumber"] != 0:
-            batchNumberUsed = True
-            cur.execute('SELECT id FROM batches WHERE id = ?', (self.data["batchNumber"].get(),))
-            if len(cur.fetchall()) > 0:
-                self.dataValid["batchNumber"] = True
-            else:
-                self.dataValid["batchNumber"] = False
-                allValid = False
         conn.close()
         
         # Ensure that quantity is an integer and is greater than 0
@@ -214,37 +212,81 @@ class AddPage(ttk.Frame):
             self.dataValid["useByDate"] = False
             allValid = False
 
+        # If all data is valid, display the confirmation screen
+        # If some data is invalid, identify the invalid data and highlight 
+        # those fields to the user.
         if allValid:
-            self.submitQuery(batchNumberUsed)
+            self.controller.data["query"] = self.constructQuery()
             self.controller.showFrame(ResultsPage)
         else:
-            self.displayInvalid(batchNumberUsed)
+            self.displayInvalid()
 
-    # Display error messages for incorrectly entered datafields
-    def displayInvalid(self, batchNumberUsed):
-        # Check each datafield in turn, and if it has been flagged as invalid, 
-        # display an error message
+
+
+    def displayInvalid(self):
+        """ 
+        Check each datafield in turn, and if it has been flagged as invalid, 
+        display an error message
+        """        
         if not self.dataValid["name"]:
             self.entriesInvalid["name"]["text"] = "Name was invalid. Ensure that name is present in the database and check spelling"
-        if not self.dataValid["batchNumber"] and batchNumberUsed:
-            self.entriesInvalid["batchNumber"]["text"] ="Batch Number was invalid. If not using, set to zero, or ensure that batch number is present in the database"
+
         if not self.dataValid["quantity"]:
             self.entriesInvalid["quantity"]["text"]= "Quantity is invalid. Ensure that it is a positive whole number"
+
         if not self.dataValid["deliveryDate"]:
             self.entriesInvalid["deliveryDate"]["text"] = "Delivery date was invalid. Ensure that it is in the form YYYY-MM-DD, that it is a possible date, and that it is not in the future"
+
         if not self.dataValid["useByDate"]:
             self.entriesInvalid["useByDate"]["text"] = "Use by date was invalid. Ensure that it is in the form YYYY-MM-DD, that it is a possible date, and that it is in the future"
 
     # construct and submit a query to the database
-    def submitQuery(self, batchNumberUsed):
+    def submitQuery(self):
+        """
+        construct and submit all necessary queries to the database, before
+        saving results to the controller, and then going to the results page.
+        If errors occur, undoes all successful database operations, then
+        saves the error details to the controller and goes to the results page.
+        """        
         conn = sql.connect("dbs/stock_database.db")
         cur = conn.cursor()
-        if batchNumberUsed is True:
-            pass
-            # get current quantity
-            # update quantity
-        else:
-            pass
+        cur.execute("PRAGMA foreign_keys = ON")
+        try:
+            # Get the id for the stock named
+            cur.execute("SELECT id FROM stock_names WHERE name = ?",(self.data["name"].get().upper(),))
+            stockId = cur.fetchone()[0]
+
+            # Add the new batch of stock to the batches table
+            cur.execute(
+                "INSERT INTO batches (stock_id, quantity_initial, quantity_current, delivered_at, use_by) VALUES (?, ?, ?, ?, ?)", 
+                (stockId, 
+                self.data["quantity"].get(), 
+                self.data["quantity"].get(), 
+                self.data["deliveryDate"].get(), 
+                self.data["useByDate"].get())
+            )
+        except sql.Error:
+            # TODO:save details of the error to the controller
+            # exit the function
+            conn.close()
+            return
+
+        try:
+            # Record the addition in the additions table
+            batchId = cur.lastrowid
+            cur.execute(
+                "INSERT INTO additions (batch_id, stock_id, quantity, added_at) VALUES (?, ?, ?, ?)",
+                (stockId,
+                batchId,
+                self.data["quantity"].get(),
+                self.data["deliveryDate"].get())
+            )
+        except sql.Error:
+            # TODO: undo the first database operation
+            # Save details of the failure to the controller
+            # exit the function
+            conn.close()
+
 
 
 class RemovePage(ttk.Frame):

@@ -3,22 +3,13 @@ from tkinter import ttk
 import sqlite3 as sql
 from pathlib import Path
 
-import A1_inventory_management.utils.tkinter_tools as tk_tools
-import A1_inventory_management.utils.query_classes_dict as qcd
-
-
-MAIN_WINDOW_WIDTH_G  = 600
-MAIN_WINDOW_HEIGHT_G = 300
- # Start to set up Tkinter window
-root = tk.Tk()
-tk_tools.resizeAndCentreWindow(MAIN_WINDOW_WIDTH_G, MAIN_WINDOW_HEIGHT_G, root)
 
 #########################
 ## def initialiseDb () ##
 #########################
 # If databases don't exist, initialise them from the db_sqlite_code file
 def initialiseDb():
-    path = Path(__file__).parent / "./dbs/db_sqlite_code.sql"
+    path = Path(__file__).parent / "../../dbs/db_sqlite_code.sql"
     conn = sql.connect("dbs/stock_database.db")
     sqlScript = ""
     with open(path) as f:
@@ -27,16 +18,6 @@ def initialiseDb():
     cursor.executescript(sqlScript)
     conn.commit()
     conn.close()
-
-#################################
-## def alterStock (Add : bool) ##
-#################################
-# Program branch for any operations that involve altering the contents of the 
-# database
-def alterStock(query):
-    if not query.valid:
-        print(f"alterStock called with query at {type(query)}")
-        value = query.displayOptions(root)
 
 ## Initial input and validation ##
 
@@ -88,26 +69,3 @@ def checkStockChoice():
 # if not query.queryAdded:
 #   Display error message saying failed to find
 # return
-
-
-
-###########################
-## displayInitialOptions ##
-###########################
-# Gives the option to choose the initial operation the user wants to perform
-def displayInitialOptions():
-    tk_tools.clearWindow(root)
-    # set up Tkinter window
-    root.title('Choose database operation')
-    # Currently just basic options for appreance, nothing fancy
-    # Add buttons and labels to add, remove, or check stock
-    optionsLabel = ttk.Label(root, text="What would you like to do today?").pack()
-
-    addStockButton = ttk.Button(root, text=f"Add Stock", command=lambda: alterStock(qcd.alterStockClassesList["add"]())).pack()
-    removeStockButton = ttk.Button(root, text=f"Remove Stock", command=lambda: alterStock(qcd.alterStockClassesList["remove"]())).pack()
-
-    checkStockButton = ttk.Button(root, text=f"Check Stock", command=lambda: checkStockChoice()).pack()
-    # Add exit button
-    exitButton = ttk.Button(root, text="exit", command=root.destroy).pack()
-    # display
-    root.mainloop()
