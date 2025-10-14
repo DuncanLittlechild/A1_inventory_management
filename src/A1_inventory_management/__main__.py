@@ -1,4 +1,5 @@
-from A1_inventory_management.core import displayInitialOptions
+import A1_inventory_management.query_classes as qc
 
 if __name__ == "__main__":
-    displayInitialOptions()
+    app = qc.App()
+    app.mainloop()

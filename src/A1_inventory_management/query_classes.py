@@ -8,8 +8,6 @@ import tkinter as tk
 from tkinter import ttk
 import sqlite3 as sql
 
-
-from A1_inventory_management.utils.tkinter_tools import clearWindow
 from A1_inventory_management.utils.query_classes_valid import isDate, dateInFuture
 
 
@@ -70,7 +68,7 @@ class App(tk.Tk):
     # Method to display a new frame of a set class
     def showFrame(self, frameClass):
         # Clear the current frame from the container
-        for widgets in self.container.winfo_children():
+        for widget in self.container.winfo_children():
             widget.destroy()
         # create a new frame attached to the container
         frame = frameClass(self.container, self)
@@ -86,16 +84,16 @@ class MainPage(ttk.Frame):
         super().__init__(parent)
         self.controller = controller
         # Labels and options to perform different queries
-        self.optionsLabel = ttk.Label(root, text="What would you like to do today?").pack()
+        self.optionsLabel = ttk.Label(self, text="What would you like to do today?").pack()
     
-        self.addStockButton = ttk.Button(root, text=f"Add Stock", command=lambda: self.controller.showFrame(AddPage)).pack()
-        self.removeStockButton = ttk.Button(root, text=f"Remove Stock", command=lambda: self.controller.showFrame(RemovePage)).pack()
+        self.addStockButton = ttk.Button(self, text=f"Add Stock", command=lambda: self.controller.showFrame(AddPage)).pack()
+        self.removeStockButton = ttk.Button(self, text=f"Remove Stock", command=lambda: self.controller.showFrame(RemovePage)).pack()
     
-        self.checkStockButton = ttk.Button(root, text=f"Check Batches", command=lambda: self.controller.showFrame(CheckBatchPage)).pack()
-        self.checkStockButton = ttk.Button(root, text=f"Check Transactions", command=lambda: self.controller.showFrame(CheckTransactionPage)).pack()
-        self.checkStockButton = ttk.Button(root, text=f"Check Total Stock", command=lambda: self.controller.showFrame(CheckStockPage)).pack()
+        self.checkStockButton = ttk.Button(self, text=f"Check Batches", command=lambda: self.controller.showFrame(CheckBatchPage)).pack()
+        self.checkStockButton = ttk.Button(self, text=f"Check Transactions", command=lambda: self.controller.showFrame(CheckTransactionPage)).pack()
+        self.checkStockButton = ttk.Button(self, text=f"Check Total Stock", command=lambda: self.controller.showFrame(CheckStockPage)).pack()
         # Exit button
-        self.exitButton = ttk.Button(root, text="exit", command=root.destroy).pack()
+        self.exitButton = ttk.Button(self, text="exit", command=self.destroy).pack()
 
 ###################
 ## class AddPage ##
@@ -105,48 +103,61 @@ class AddPage(ttk.Frame):
     def __init__(self, parent, controller):
         super().__init__(parent)
         self.controller = controller
-        # Datafields required for a query to add data
+        # Datafields to store information for the sqlite query
         self.data = {
-            "name" = tk.StringVar()
-            "quantity" = tk.IntVar()
-            "deliveryDate" = tk.StringVar()
-            "useByDate" = tk.StringVar()
-            "batchNumber" = tk.IntVar()
+            "name" : tk.StringVar(),
+            "quantity" : tk.IntVar(),
+            "deliveryDate" : tk.StringVar(),
+            "useByDate" : tk.StringVar(),
+            "batchNumber" : tk.IntVar(),
         }
+        # datafields to record if the respective variable field is valid
         self.dataValid = {
-            "name" = None
-            "quantity" = None
-            "deliveryDate" = None
-            "useByDate" = None
-            "batchNumber" = None
+            "name" : None,
+            "quantity" : None,
+            "deliveryDate" : None,
+            "useByDate" : None,
+            "batchNumber" : None,
         }
-        # name datafields
-        self.nameLabel = ttk.Label(self, text="Name of Good").pack()
-        self.nameEntry = ttk.Entry(self, textvariable=self.data["name"]).pack()
-        self.nameEntryInvalid = ttk.Label(self, text="").pack()
 
-        # batchNumber Datafields
-        self.batchNumberLabel = ttk.Label(self, text="Batch Number(optional)").pack()
-        self.batchNumberEntry = ttk.Entry(self, textvariable=self.data["batchNumber"]).pack()
-        self.batchNumberEntryInvalid = ttk.Label(self, text="").pack()
+        # Store for labels for each member of self.data
+        self.labels = {
+            "name": ttk.Label(self, text="Name of Good"),
+            "batchNumber": ttk.Label(self, text="Batch Number(optional)"),
+            "quantity": ttk.Label(self, text="Quantity of good"),
+            "deliveryDate": ttk.Label(self, text="Delivery Date (YYYY-MM-DD)"),
+            "useByDate": ttk.Label(self, text="Use By Date (YYYY-MM-DD)")
+        }
+        # store for entries for each member of self.data
+        self.entries = {
+            "name": ttk.Entry(self, textvariable=self.data["name"]),
+            "batchNumber": ttk.Entry(self, textvariable=self.data["batchNumber"]),
+            "quantity": ttk.Entry(self, textvariable=self.data["quantity"]),
+            "deliveryDate": ttk.Entry(self, textvariable=self.data["deliveryDate"]),
+            "useByDate": ttk.Entry(self, textvariable=self.data["useByDate"])
+        }
+        # store for input error warnings for each member of self.data
+        # These will be modified to display text if any fields are found to 
+        # contain invalid data
+        self.entriesInvalid = {
+            "name": ttk.Label(self, text=""),
+            "batchNumber": ttk.Label(self, text=""),
+            "quantity": ttk.Label(self, text=""),
+            "deliveryDate": ttk.Label(self, text=""),
+            "useByDate": ttk.Label(self, text="")
+        }
+        self.submitButton = ttk.Button(self, text="Submit details", command=self.checkValid)
+        # Loop to display labels, entries, and invalids
+        # I chose to seperate them like this because each type of tkinter 
+        # object may need to be displayed in their own style, and this allows 
+        # for that.
+        for dataField in self.labels:
+            self.labels[dataField].pack()
+            self.entries[dataField].pack()
+            self.entriesInvalid[dataField].pack()
 
-        # quantity Datafields
-        self.quantityLabel = ttk.Label(self, text="Quantity of good").pack()
-        self.quantityEntry = ttk.Entry(self, textvariable=self.data["quantity"]).pack()
-        self.quantityEntryInvalid = ttk.Label(self, text="").pack()
+        self.submitButton.pack()
 
-        # deliveryDate Datafields
-        self.deliveryDateLabel = ttk.Label(self, text="Delivery Date (YYYY-MM-DD)").pack()
-        self.deliveryDateEntry = ttk.Entry(self, textvariable=self.data["deliveryDate"]).pack()
-        self.deliveryDateEntryInvalid = ttk.Label(self, text="").pack()
-
-        # useByDate Datafields
-        self.useByDateLabel = ttk.Label(self, text="Use By Date (YYYY-MM-DD)").pack()
-        self.useByDateEntry = ttk.Entry(self, textvariable=self.data["useByDate"]).pack()
-        self.useByDateEntryInvalid = ttk.Label(self, text="").pack()
-
-        # On submission, check to make sure all values are valid before adding them to the object.
-        self.submitButton = ttk.Button(window, text="Submit details", command= self.checkValid()).pack()
 
     # make sure that values entered are all valid
     def checkValid(self):
@@ -166,7 +177,7 @@ class AddPage(ttk.Frame):
          # This is placed here so the connection can be closed as soon as possible
          # batchNumberUsed is used to tell displayInvalid if the batchNumber was used
         batchNumberUsed = False
-        if batchNumberVar != 0:
+        if self.data["batchNumber"] != 0:
             batchNumberUsed = True
             cur.execute('SELECT id FROM batches WHERE id = ?', (self.data["batchNumber"].get(),))
             if len(cur.fetchall()) > 0:
@@ -211,82 +222,50 @@ class AddPage(ttk.Frame):
 
     # Display error messages for incorrectly entered datafields
     def displayInvalid(self, batchNumberUsed):
+        # Check each datafield in turn, and if it has been flagged as invalid, 
+        # display an error message
         if not self.dataValid["name"]:
-            self.nameEntryInvalid.config(text="Name was invalid. Ensure that name is present in the database and check spelling")
+            self.entriesInvalid["name"]["text"] = "Name was invalid. Ensure that name is present in the database and check spelling"
         if not self.dataValid["batchNumber"] and batchNumberUsed:
-            self.batchNumberEntryInvalid.config(text="Batch Number was invalid. If not using, set to zero, or ensure that batch number is present in the database")
+            self.entriesInvalid["batchNumber"]["text"] ="Batch Number was invalid. If not using, set to zero, or ensure that batch number is present in the database"
         if not self.dataValid["quantity"]:
-            self.quantityEntryInvalid(text="Quantity is invalid. Ensure that it is a positive whole number")
+            self.entriesInvalid["quantity"]["text"]= "Quantity is invalid. Ensure that it is a positive whole number"
         if not self.dataValid["deliveryDate"]:
-            self.deliveryDateEntryInvalid.config(text="Delivery date was invalid. Ensure that it is in the form YYYY-MM-DD, that it is a possible date, and that it is not in the future")
+            self.entriesInvalid["deliveryDate"]["text"] = "Delivery date was invalid. Ensure that it is in the form YYYY-MM-DD, that it is a possible date, and that it is not in the future"
         if not self.dataValid["useByDate"]:
-            self.useByDateInvalid.config(text="Use by date was invalid. Ensure that it is in the form YYYY-MM-DD, that it is a possible date, and that it is in the future")
+            self.entriesInvalid["useByDate"]["text"] = "Use by date was invalid. Ensure that it is in the form YYYY-MM-DD, that it is a possible date, and that it is in the future"
 
     # construct and submit a query to the database
     def submitQuery(self, batchNumberUsed):
         conn = sql.connect("dbs/stock_database.db")
         cur = conn.cursor()
         if batchNumberUsed is True:
+            pass
             # get current quantity
             # update quantity
         else:
-            cursor.execute("INSERT INTO batches (name, 
+            pass
 
+
+class RemovePage(ttk.Frame):
+    def __init__(self, parent, controller):
+        pass
+
+class CheckBatchPage(ttk.Frame):
+    def __init__(self, parent, controller):
+        pass
     
-
-#####################
-## class BaseQuery ##
-#####################
-# This class creates the template that the other Query classes must follow
-class BaseQuery(ABC):
-    def __init__(self):
-        self.valid = False
-        self.__query = ""
-        self.__queryAdded = False
-        self.__window = tk.Tk()
-
-# These functions are declared here as virtual functions to ensure that they
-# are implemented by all children, to ensure that this basic functionality is
-# properly implemented across the board.
-
-# displayOptions alters the Tkiter widget to display the options that the user
-# has to fine tune the query they want to run
-    @abstractmethod
-    def displayOptions(self, window):
+class CheckTransactionPage(ttk.Frame):
+    def __init__(self, parent, controller):
         pass
 
-# checkValid checks each member variable __x that has a __xValid flag
-# attached to it, and makes sure that __x is valid. If it is, then __xValid is
-# set to True; if it is not, then _xValid is set to false. If every variable
-# that fits this pattern is valid, the overall __valid flag is set to True;
-# otherwise, __valid is set to/remains False
-    @abstractmethod
-    def checkValid(self):
+class CheckStockPage(ttk.Frame):
+    def __init__(self, parent, controller):
         pass
 
-# displayInvalid alters the Tkinter widget to display those variables __x that
-# have their __xValid flag set to false, with information about what a valid
-# instance of that variable should be
-    @abstractmethod
-    def displayInvalid(self):
+class ResultsPage(ttk.Frame):
+    def __init__(self, parent, controller):
         pass
-
-# constructQuery is used to construct the sqlite3 query as a string. This part
-# does not directly use any user input, but rather uses the data in the class
-# instance to construct a query that contains the datafields the user wants
-    @abstractmethod
-    def constructQuery(self):
-        pass
-
-# updateDatabase submits the completed query to the sqlite3 database, and
-# checks to make sure that the query was successfully recieved
-    @abstractmethod
-    def updateDatabase(self):
-        pass
-
-
-####################
-
 #######################
 ## class RemoveQuery ##
 #######################
@@ -294,7 +273,7 @@ class BaseQuery(ABC):
 # Does not currently remove batches, as the current architecture holds on to
 # batch information for archival and auditing purposes - removal of batches is
 # a planned feature to add in subsequent updates.
-class RemoveQuery(BaseQuery):
+class RemoveQuery():
     def __init__(self):
         super().__init__()
         self.__batchNumber = -1
@@ -328,7 +307,7 @@ class RemoveQuery(BaseQuery):
 ######################
 # Abstract class used to add the outputToCSV method to the 3 (as of 9/10/25)
 # xCheckQuery classes
-class CheckQuery(BaseQuery):
+class CheckQuery():
     @abstractmethod
     def outputToCSV(self):
         pass
@@ -340,7 +319,7 @@ class CheckQuery(BaseQuery):
 # Class used to get information about specific transations
 class TransactionCheckQuery(CheckQuery):
     def __init__(self):
-        BaseQuery.__init__(self)
+        super().__init__(self)
         self.__transactionType = TransactionType.ADD
         self.__batchNumber = -1
         self.__batchNumberValid = False
@@ -377,7 +356,7 @@ class TransactionCheckQuery(CheckQuery):
 # number.
 class BatchCheckQuery(CheckQuery):
     def __init__(self):
-        BaseQuery.__init__(self)
+        super().__init__(self)
         self.__batchNumber = -1
         self.__batchNumberValid = False
         self.__stockName = ""
@@ -409,7 +388,7 @@ class BatchCheckQuery(CheckQuery):
 # Class used to get information about stock at various points in time.
 class StockCheckQuery(CheckQuery):
     def __init__(self):
-        BaseQuery.__init__(self)
+        super().__init__(self)
         self.__allStock = False
         self.__stockList = [""]
         self.__stockListValid = False
