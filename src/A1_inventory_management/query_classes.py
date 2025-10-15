@@ -2,13 +2,12 @@
 # and execute the sqlite3 queries.
 
 # See the UML diagram for a clearer picture of their relationship to each other
-from abc import ABC, abstractmethod
 from enum import Enum
 import tkinter as tk
 from tkinter import ttk
 import sqlite3 as sql
 
-from A1_inventory_management.utils.query_classes_valid import isDate, dateInFuture
+from A1_inventory_management.utils.query_classes_valid import isDate, dateInFuture, removeLeadingZeroes, dateLessThan
 
 TRANSACTION_TYPE_ADDITION_STRING = 'addition'
 TRANSACTION_TYPE_REMOVAL_STRING = 'removal'
@@ -294,9 +293,15 @@ class AddPage(ttk.Frame):
         the controller, and then going to the results page.
         """        
         parameters = self.controller.queryData["parameters"]
+
+        # Remove leading zeroes from dates
+        deliveryDate = removeLeadingZeroes(parameters["deliveryDate"].get())
+        useByDate = removeLeadingZeroes(parameters["useByDate"].get())
+
         conn = sql.connect("dbs/stock_database.db")
         cur = conn.cursor()
         cur.execute("PRAGMA foreign_keys = ON")
+
         stockId = parameters["name"].get()
         try:
             # if a name has been used, get the id
@@ -310,14 +315,13 @@ class AddPage(ttk.Frame):
                 (stockId, 
                 parameters["quantity"].get(), 
                 parameters["quantity"].get(), 
-                parameters["deliveryDate"].get(), 
-                parameters["useByDate"].get())
+                deliveryDate, 
+                useByDate)
             )
         except sql.Error:
-            # Save details of the error to the controller
-            # exit the function
             conn.close()
             print("batch query errored")
+            # Save details of the error to the controller
             self.controller.queryData["outcome"] = FAILURE_STRING_G
             return
         
@@ -327,19 +331,22 @@ class AddPage(ttk.Frame):
         try:
             # Record the addition in the transactions table
             cur.execute(
-                "INSERT INTO transactions (batch_id, stock_id,transaction_type, quantity, occured_at) VALUES (?, ?, ?, ?)",
-                (batchId,
+                "INSERT INTO transactions (transaction_type, batch_id, stock_id, quantity, occured_at) VALUES (?, ?, ?, ?, ?)",
+                (                TRANSACTION_TYPE_ADDITION_STRING,
+                batchId,
                 stockId,
-                TRANSACTION_TYPE_ADDITION_STRING,
                 parameters["quantity"].get(),
-                parameters["deliveryDate"].get())
+                deliveryDate)
             )
         except sql.Error:
             conn.close()
             print("addition query errored")
+
             # Save details of the failure to the controller
             self.controller.queryData["outcome"] = FAILURE_STRING_G
+
             # exit the function
+            return
         conn.commit()
         conn.close()
         self.controller.queryData["result"].append(batchId)
@@ -362,7 +369,7 @@ class RemovePage(ttk.Frame):
         # Datafields to store information for the sqlite query
         self.controller.queryData["type"] = TYPE_STRING_REMOVE
         self.controller.queryData["parameters"] = {
-            "batchNumber" : tk.IntVar(),
+            "batchId" : tk.IntVar(),
             "quantity" : tk.IntVar(),
             "removalDate" : tk.StringVar(),
             "removalReason" : tk.StringVar()
@@ -371,7 +378,7 @@ class RemovePage(ttk.Frame):
         parameters = self.controller.queryData["parameters"]
         # datafields to record if the respective variable field is valid
         self.dataValid = {
-            "batchNumber" : None,
+            "batchId" : None,
             "quantity" : None,
             "removalDate" : None,
             "removalReason" : None,
@@ -379,14 +386,14 @@ class RemovePage(ttk.Frame):
 
         # Store for labels for each member of self.data
         self.labels = {
-            "batchNumber" : ttk.Label(self, text="Batch Number"),
+            "batchId" : ttk.Label(self, text="Batch Number"),
             "quantity": ttk.Label(self, text="Quantity removed"),
             "removalDate": ttk.Label(self, text="Date of removal (YYYY-MM-DD)"),
             "removalReason": ttk.Label(self, text="Reason for removal")
         }
         # store for entries for each member of self.data
         self.entries = {
-            "batchNumber" : ttk.Entry(self, textvariable=parameters["batchNumber"]),
+            "batchId" : ttk.Entry(self, textvariable=parameters["batchId"]),
             "quantity": ttk.Entry(self, textvariable=parameters["quantity"]),
             "removalDate": ttk.Entry(self, textvariable=parameters["removalDate"]),
             "removalReason": []
@@ -398,7 +405,7 @@ class RemovePage(ttk.Frame):
         # These will be modified to display text if any fields are found to 
         # contain invalid data
         self.entriesInvalid = {
-            "batchNumber" : ttk.Label(self, text=""),
+            "batchId" : ttk.Label(self, text=""),
             "quantity": ttk.Label(self, text=""),
             "removalDate": ttk.Label(self, text=""),
             "removalReason": ttk.Label(self, text="")
@@ -431,38 +438,51 @@ class RemovePage(ttk.Frame):
         parameters = self.controller.queryData["parameters"]
         # use flag to see if any data are incorrectly formatted
         allValid = True
-        # check batchNumber is valid by running a quick sqlite query
-        conn = sql.connect("dbs/stock_database.db")
-        cur = conn.cursor()
 
-        cur.execute('SELECT id FROM batches WHERE id = ?', (parameters["batchNumber"].get(),))
+        #Connect to the database
+        conn = sql.connect("dbs/stock_database.db")
+        cur = conn.cursor() 
+
+        batchId = parameters["batchId"].get()
+        # check batchId exists in batches
+        cur.execute('SELECT id FROM batches WHERE id = ?', (batchId,))
         if len(cur.fetchall()) > 0:
-            self.dataValid["batchNumber"] = True
+            self.dataValid["batchId"] = True
         else:
-            self.dataValid["batchNumber"] = False
-            allValid = False
+            self.dataValid["batchId"] = False
+            # If batch number is not valid, none of the other checks will return 
+            # valid.
+            self.displayInvalid()
+            return
 
         
         # Ensure that quantity is an integer is greater than 0, and is not more
         # than the quantity_current in the chosen batch
         # IntVar objects reset their value to 0 if a non-integer is entered, 
         # so this test checks the first two parameters
-        cur.execute('SELECT quantity_current FROM batches WHERE id = ?', (parameters["batchNumber"].get(),))
+        cur.execute('SELECT quantity_current FROM batches WHERE id = ?', (batchId,))
         quantity = parameters["quantity"].get()
         if quantity > 0 and int(cur.fetchone()[0]) >= quantity:
             self.dataValid["quantity"] = True
         else:
             self.dataValid["quantity"] = False
             allValid = False
-        conn.close()
-        # Ensure that the delivery date is formatted correctly (yyyy-mm-dd), 
-        # that all parts are possible (eg, no 13th month), and that it is not in 
-        # the future
-        if isDate(parameters["removalDate"].get()) and not dateInFuture(parameters["removalDate"].get()):
+
+        # Ensure that the removal date is formatted correctly (yyyy-mm-dd), 
+        # that all parts are possible (eg, no 13th month), and that it is later than the delivery date on the batch
+        cur.execute('SELECT delivered_at FROM batches WHERE id = ?', (batchId,))
+
+        deliveryDate = cur.fetchone()[0]
+        print(f"{deliveryDate}")
+        removalDate = removeLeadingZeroes(parameters["removalDate"].get())
+        print(f"{removalDate}")
+
+        if isDate(removalDate) and not dateInFuture(removalDate) and not dateLessThan(removalDate, deliveryDate):
             self.dataValid["removalDate"] = True
         else:
             self.dataValid["removalDate"] = False
             allValid = False
+        conn.close()
 
         # If all data is valid, display the confirmation screen
         # If some data is invalid, identify the invalid data and highlight 
@@ -480,10 +500,10 @@ class RemovePage(ttk.Frame):
         Check each datafield in turn, and if it has been flagged as invalid,
         display an error message. Otherwise, remove existing error messages.
         """        
-        if not self.dataValid["batchNumber"]:
-            self.entriesInvalid["batchNumber"]["text"] = "Batch number was not found in database."
+        if not self.dataValid["batchId"]:
+            self.entriesInvalid["batchId"]["text"] = "Batch number was not found in database."
         else:
-            self.entriesInvalid["batchNumber"]["text"] = ""
+            self.entriesInvalid["batchId"]["text"] = ""
 
         if not self.dataValid["quantity"]:
             self.entriesInvalid["quantity"]["text"]= "Quantity must be a positive whole number, less than the batches current quantity"
@@ -508,37 +528,49 @@ class RemovePage(ttk.Frame):
         the controller, and then going to the results page.
         """        
         parameters = self.controller.queryData["parameters"]
+
+        # Remove leading zeroes from dates
+        removalDate = removeLeadingZeroes(parameters["removalDate"].get())
+
+        # Connect to database
         conn = sql.connect("dbs/stock_database.db")
         cur = conn.cursor()
         cur.execute("PRAGMA foreign_keys = ON")
-        batchId = parameters["batchNumber"].get()
+
+        batchId = parameters["batchId"].get()
         try:
             # Get the current quantity of the desired batch
             cur.execute("SELECT quantity_current FROM batches WHERE id = ?", (batchId,))
+
             # Calculate the new quantity
             currentQuantity = cur.fetchone()[0]
             newQuantity = currentQuantity - parameters["quantity"].get()
+            
             # Update the desired batch
             cur.execute("UPDATE batches SET quantity_current = ? WHERE id = ?", (newQuantity, batchId))
 
         except sql.Error:
-            # Save details of the error to the controller
-            # exit the function
             conn.close()
             print("batch query errored")
+
+            # Save details of the error to the controller
             self.controller.queryData["outcome"] = FAILURE_STRING_G
+            # exit the function
             return
+        
+        # Get stockId needed to add to transaction table
         cur.execute("SELECT stock_id FROM batches WHERE id = ?", (batchId,))
         stockId = cur.fetchone()[0]
+
         try:
             # Record the removal in the transactions table
             cur.execute(
-                "INSERT INTO transactions (batch_id, stock_id,transaction_type, quantity, occured_at, removal_reason) VALUES (?, ?, ?, ?, ?)",
+                "INSERT INTO transactions (batch_id, stock_id,transaction_type, quantity, occured_at, removal_reason) VALUES (?, ?, ?, ?, ?, ?)",
                 (batchId,
                 stockId,
                 TRANSACTION_TYPE_REMOVAL_STRING,
                 parameters["quantity"].get(),
-                parameters["removalDate"].get(),
+                removalDate,
                 parameters["removalReason"].get())
             )
         except sql.Error:
@@ -547,6 +579,7 @@ class RemovePage(ttk.Frame):
             # Save details of the failure to the controller
             self.controller.queryData["outcome"] = FAILURE_STRING_G
             # exit the function
+            return
         
         conn.commit()
         conn.close()
