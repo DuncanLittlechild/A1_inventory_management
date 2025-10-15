@@ -10,17 +10,37 @@ import sqlite3 as sql
 
 from A1_inventory_management.utils.query_classes_valid import isDate, dateInFuture
 
+TRANSACTION_TYPE_ADDITION_STRING = 'addition'
+TRANSACTION_TYPE_REMOVAL_STRING = 'removal'
+
+FAILURE_STRING_G = "failed"
+SUCCESS_STRING_G = "succeeded"
+
+TYPE_STRING_ADD = "ADD"
+TYPE_STRING_REMOVE = "remove"
+TYPE_STRING_CHECK = "check"
+
+OUTCOME_STRINGS = {
+    TYPE_STRING_ADD : "added to",
+    TYPE_STRING_REMOVE: "removed from",
+    TYPE_STRING_CHECK: "checked in"
+}
+
+MAX_ROWS_TO_DISPLAY = 10
+
 
 ########################
 ## enum RemovalReason ##
 ########################
 # Enum used to record the reason for goods being removed from a batch
-class RemovalReason(Enum):
-    USED        = 0
-    OUT_OF_DATE = 1
-    RETURNED    = 2
-    LOST        = 3
-    DESTROYED   = 4
+RemovalReason = [
+    # Display text  # Database record
+    ("Used",        "used"       ),
+    ("Out of Date", "out_of_date"),
+    ("Returned",    "returned"   ),
+    ("Lost",        "lost"       ),
+    ("Destroyed",   "destroyed"  )
+]
 
 ##########################
 ## enum TransactionType ##
@@ -30,6 +50,8 @@ class TransactionType(Enum):
     ADD    = 0
     REMOVE = 1
     BOTH   = 2
+
+
 
 
 ###############
@@ -60,7 +82,8 @@ class App(tk.Tk):
 
         # Datafield to contain the fulfilled, returned query
         self.queryData = {
-            "type" : "",
+            "type" : "Not started",
+            "outcome": "Not started",
             "parameters" : {},
             "result" : []
         }
@@ -101,7 +124,7 @@ class MainPage(ttk.Frame):
         self.checkStockButton = ttk.Button(self, text=f"Check Transactions", command=lambda: self.controller.showFrame(CheckTransactionPage)).pack()
         self.checkStockButton = ttk.Button(self, text=f"Check Total Stock", command=lambda: self.controller.showFrame(CheckStockPage)).pack()
         # Exit button
-        self.exitButton = ttk.Button(self, text="exit", command=self.destroy).pack()
+        self.exitButton = ttk.Button(self, text="exit", command=self.controller.destroy).pack()
 
 ###################
 ## class AddPage ##
@@ -115,12 +138,15 @@ class AddPage(ttk.Frame):
         super().__init__(parent)
         self.controller = controller
         # Datafields to store information for the sqlite query
-        self.data = {
+        self.controller.queryData["type"] = TYPE_STRING_ADD
+        self.controller.queryData["parameters"] = {
             "name" : tk.StringVar(),
             "quantity" : tk.IntVar(),
             "deliveryDate" : tk.StringVar(),
             "useByDate" : tk.StringVar(),
         }
+        # assign this variable to shorten the path
+        parameters = self.controller.queryData["parameters"]
         # datafields to record if the respective variable field is valid
         self.dataValid = {
             "name" : None,
@@ -131,17 +157,17 @@ class AddPage(ttk.Frame):
 
         # Store for labels for each member of self.data
         self.labels = {
-            "name": ttk.Label(self, text="Name of Good"),
+            "name": ttk.Label(self, text="Name/Id Number of Good"),
             "quantity": ttk.Label(self, text="Quantity of good"),
             "deliveryDate": ttk.Label(self, text="Delivery Date (YYYY-MM-DD)"),
             "useByDate": ttk.Label(self, text="Use By Date (YYYY-MM-DD)")
         }
         # store for entries for each member of self.data
         self.entries = {
-            "name": ttk.Entry(self, textvariable=self.data["name"]),
-            "quantity": ttk.Entry(self, textvariable=self.data["quantity"]),
-            "deliveryDate": ttk.Entry(self, textvariable=self.data["deliveryDate"]),
-            "useByDate": ttk.Entry(self, textvariable=self.data["useByDate"])
+            "name": ttk.Entry(self, textvariable=parameters["name"]),
+            "quantity": ttk.Entry(self, textvariable=parameters["quantity"]),
+            "deliveryDate": ttk.Entry(self, textvariable=parameters["deliveryDate"]),
+            "useByDate": ttk.Entry(self, textvariable=parameters["useByDate"])
         }
         # store for input error warnings for each member of self.data
         # These will be modified to display text if any fields are found to 
@@ -162,7 +188,7 @@ class AddPage(ttk.Frame):
             self.entries[dataField].pack()
             self.entriesInvalid[dataField].pack()
 
-        ttk.Button(self, text="Submit details", command=self.checkValid)
+        ttk.Button(self, text="Submit details", command=self.checkValid).pack()
 
     # make sure that values entered are all valid
     def checkValid(self):
@@ -172,12 +198,19 @@ class AddPage(ttk.Frame):
         all values are valid, then the query is submitted; otherwise, the 
         invalid fields are flagged and the user is asked to re-enter that data.
         """        
+        parameters = self.controller.queryData["parameters"]
         # use flag to see if any data are incorrectly formatted
         allValid = True
         # check name is valid by running a quick sqlite query
         conn = sql.connect("dbs/stock_database.db")
         cur = conn.cursor()
-        cur.execute('SELECT name FROM stock_names WHERE name = ?', (self.data["name"].get().upper(),))
+
+        #Check to see if a stock number was entered instead of a name
+        # If it was, search for the id, not the name
+        if parameters["name"].get().isnumeric():
+            cur.execute('SELECT id FROM stock_names WHERE id = ?', (parameters["name"].get(),))
+        else:
+            cur.execute('SELECT name FROM stock_names WHERE name = ?', (parameters["name"].get().lower(),))
         if len(cur.fetchall()) > 0:
             self.dataValid["name"] = True
         else:
@@ -188,7 +221,7 @@ class AddPage(ttk.Frame):
         # Ensure that quantity is an integer and is greater than 0
         # IntVar objects reset their value to 0 if a non-integer is entered, 
         # so this test checks both parameters
-        if self.data["quantity"].get() > 0:
+        if parameters["quantity"].get() > 0:
             self.dataValid["quantity"] = True
         else:
             self.dataValid["quantity"] = False
@@ -197,7 +230,7 @@ class AddPage(ttk.Frame):
         # Ensure that the delivery date is formatted correctly (yyyy-mm-dd), 
         # that all parts are possible (eg, no 13th month), and that it is not in 
         # the future
-        if isDate(self.data["deliveryDate"].get()) and not dateInFuture(self.data["deliveryDate"].get()):
+        if isDate(parameters["deliveryDate"].get()) and not dateInFuture(parameters["deliveryDate"].get()):
             self.dataValid["deliveryDate"] = True
         else:
             self.dataValid["deliveryDate"] = False
@@ -206,7 +239,7 @@ class AddPage(ttk.Frame):
         # Ensure that the use by date is formatted correctly (yyyy-mm-dd),
         # that all parts are possible (eg, no 13th month), and that it is in 
         # the future
-        if isDate(self.data["useByDate"].get()) and dateInFuture(self.data["useByDate"].get()):
+        if isDate(parameters["useByDate"].get()) and dateInFuture(parameters["useByDate"].get()):
             self.dataValid["useByDate"] = True
         else:
             self.dataValid["useByDate"] = False
@@ -216,7 +249,7 @@ class AddPage(ttk.Frame):
         # If some data is invalid, identify the invalid data and highlight 
         # those fields to the user.
         if allValid:
-            self.controller.data["query"] = self.constructQuery()
+            self.submitQuery()
             self.controller.showFrame(ResultsPage)
         else:
             self.displayInvalid()
@@ -225,73 +258,299 @@ class AddPage(ttk.Frame):
 
     def displayInvalid(self):
         """ 
-        Check each datafield in turn, and if it has been flagged as invalid, 
-        display an error message
+        Check each datafield in turn, and if it has been flagged as invalid,
+        display an error message. Otherwise, remove existing error messages.
         """        
         if not self.dataValid["name"]:
-            self.entriesInvalid["name"]["text"] = "Name was invalid. Ensure that name is present in the database and check spelling"
+            self.entriesInvalid["name"]["text"] = "Name/id number was not found in database. Please check spelling"
+        else:
+            self.entriesInvalid["name"]["text"] = ""
 
         if not self.dataValid["quantity"]:
-            self.entriesInvalid["quantity"]["text"]= "Quantity is invalid. Ensure that it is a positive whole number"
+            self.entriesInvalid["quantity"]["text"]= "Quantity must be a positive whole number"
+        else:
+            self.entriesInvalid["quantity"]["text"] = ""
 
         if not self.dataValid["deliveryDate"]:
-            self.entriesInvalid["deliveryDate"]["text"] = "Delivery date was invalid. Ensure that it is in the form YYYY-MM-DD, that it is a possible date, and that it is not in the future"
+            self.entriesInvalid["deliveryDate"]["text"] = "Delivery date must be in the form YYYY-MM-DD"
+        else:
+            self.entriesInvalid["deliveryDate"]["text"] = ""
 
         if not self.dataValid["useByDate"]:
-            self.entriesInvalid["useByDate"]["text"] = "Use by date was invalid. Ensure that it is in the form YYYY-MM-DD, that it is a possible date, and that it is in the future"
+            self.entriesInvalid["useByDate"]["text"] = "Use by date must be in the form YYYY-MM-DD"
+        else:
+            self.entriesInvalid["useByDate"]["text"] = ""
+
 
     # construct and submit a query to the database
     def submitQuery(self):
         """
-        construct and submit all necessary queries to the database, before
-        saving results to the controller, and then going to the results page.
-        If errors occur, undoes all successful database operations, then
-        saves the error details to the controller and goes to the results page.
+        First add a record to the batches database, then add a record to the
+        additions database, save results to the controller, and then going to 
+        the results page.
+
+        The database updates are transactional. Failure will result in
+        successful updates being undone, details of the failure being saved to
+        the controller, and then going to the results page.
         """        
+        parameters = self.controller.queryData["parameters"]
         conn = sql.connect("dbs/stock_database.db")
         cur = conn.cursor()
         cur.execute("PRAGMA foreign_keys = ON")
+        stockId = parameters["name"].get()
         try:
-            # Get the id for the stock named
-            cur.execute("SELECT id FROM stock_names WHERE name = ?",(self.data["name"].get().upper(),))
-            stockId = cur.fetchone()[0]
+            # if a name has been used, get the id
+            if not parameters["name"].get().isnumeric():
+                cur.execute("SELECT id FROM stock_names WHERE name = ?",(parameters["name"].get().lower(),))
+                stockId = cur.fetchone()[0]
 
             # Add the new batch of stock to the batches table
             cur.execute(
                 "INSERT INTO batches (stock_id, quantity_initial, quantity_current, delivered_at, use_by) VALUES (?, ?, ?, ?, ?)", 
                 (stockId, 
-                self.data["quantity"].get(), 
-                self.data["quantity"].get(), 
-                self.data["deliveryDate"].get(), 
-                self.data["useByDate"].get())
+                parameters["quantity"].get(), 
+                parameters["quantity"].get(), 
+                parameters["deliveryDate"].get(), 
+                parameters["useByDate"].get())
             )
         except sql.Error:
-            # TODO:save details of the error to the controller
+            # Save details of the error to the controller
             # exit the function
             conn.close()
+            print("batch query errored")
+            self.controller.queryData["outcome"] = FAILURE_STRING_G
             return
-
+        
+        # record the batchId outside of the try except loop to allow the 
+        # prior transaction to be undone.
+        batchId = cur.lastrowid
         try:
-            # Record the addition in the additions table
-            batchId = cur.lastrowid
+            # Record the addition in the transactions table
             cur.execute(
-                "INSERT INTO additions (batch_id, stock_id, quantity, added_at) VALUES (?, ?, ?, ?)",
-                (stockId,
-                batchId,
-                self.data["quantity"].get(),
-                self.data["deliveryDate"].get())
+                "INSERT INTO transactions (batch_id, stock_id,transaction_type, quantity, occured_at) VALUES (?, ?, ?, ?)",
+                (batchId,
+                stockId,
+                TRANSACTION_TYPE_ADDITION_STRING,
+                parameters["quantity"].get(),
+                parameters["deliveryDate"].get())
             )
         except sql.Error:
-            # TODO: undo the first database operation
+            conn.close()
+            print("addition query errored")
             # Save details of the failure to the controller
+            self.controller.queryData["outcome"] = FAILURE_STRING_G
+            # exit the function
+        conn.commit()
+        conn.close()
+        self.controller.queryData["result"].append(batchId)
+        self.controller.queryData["outcome"] = SUCCESS_STRING_G
+
+
+
+########################
+########################
+### class RemovePage ###
+########################
+########################
+class RemovePage(ttk.Frame):
+    """
+    Frame to remove data from the databases
+    """    
+    def __init__(self, parent, controller):
+        super().__init__(parent)
+        self.controller = controller
+        # Datafields to store information for the sqlite query
+        self.controller.queryData["type"] = TYPE_STRING_REMOVE
+        self.controller.queryData["parameters"] = {
+            "batchNumber" : tk.IntVar(),
+            "quantity" : tk.IntVar(),
+            "removalDate" : tk.StringVar(),
+            "removalReason" : tk.StringVar()
+        }
+        # assign this variable to shorten the path
+        parameters = self.controller.queryData["parameters"]
+        # datafields to record if the respective variable field is valid
+        self.dataValid = {
+            "batchNumber" : None,
+            "quantity" : None,
+            "removalDate" : None,
+            "removalReason" : None,
+        }
+
+        # Store for labels for each member of self.data
+        self.labels = {
+            "batchNumber" : ttk.Label(self, text="Batch Number"),
+            "quantity": ttk.Label(self, text="Quantity removed"),
+            "removalDate": ttk.Label(self, text="Date of removal (YYYY-MM-DD)"),
+            "removalReason": ttk.Label(self, text="Reason for removal")
+        }
+        # store for entries for each member of self.data
+        self.entries = {
+            "batchNumber" : ttk.Entry(self, textvariable=parameters["batchNumber"]),
+            "quantity": ttk.Entry(self, textvariable=parameters["quantity"]),
+            "removalDate": ttk.Entry(self, textvariable=parameters["removalDate"]),
+            "removalReason": []
+        }
+        self.entries["removalReason"] = [
+            ttk.Radiobutton(self, text=f"{RemovalReason[i][0]}", value=f"{RemovalReason[i][1]}", variable=parameters["removalReason"]) for i in range(len(RemovalReason))
+        ]
+        # store for input error warnings for each member of self.data
+        # These will be modified to display text if any fields are found to 
+        # contain invalid data
+        self.entriesInvalid = {
+            "batchNumber" : ttk.Label(self, text=""),
+            "quantity": ttk.Label(self, text=""),
+            "removalDate": ttk.Label(self, text=""),
+            "removalReason": ttk.Label(self, text="")
+        }
+       
+        # Loop to display labels, entries, and invalids
+        # I chose to seperate them like this because each type of tkinter 
+        # object may need to be displayed in their own style, and this allows 
+        # for that.
+        for dataField in self.labels:
+            self.labels[dataField].pack()
+            entry = self.entries[dataField]
+            if isinstance(entry, list):
+                for item in entry:
+                    item.pack()
+            else:
+                entry.pack()
+            self.entriesInvalid[dataField].pack()
+
+        ttk.Button(self, text="Submit details", command=self.checkValid).pack()
+
+    # make sure that values entered are all valid
+    def checkValid(self):
+        """
+        Check each value in self.data in turn to ensure that it conforms to the
+        syntax of the sql database, and mark it as invalid if it does not. If
+        all values are valid, then the query is submitted; otherwise, the 
+        invalid fields are flagged and the user is asked to re-enter that data.
+        """        
+        parameters = self.controller.queryData["parameters"]
+        # use flag to see if any data are incorrectly formatted
+        allValid = True
+        # check batchNumber is valid by running a quick sqlite query
+        conn = sql.connect("dbs/stock_database.db")
+        cur = conn.cursor()
+
+        cur.execute('SELECT id FROM batches WHERE id = ?', (parameters["batchNumber"].get(),))
+        if len(cur.fetchall()) > 0:
+            self.dataValid["batchNumber"] = True
+        else:
+            self.dataValid["batchNumber"] = False
+            allValid = False
+
+        
+        # Ensure that quantity is an integer is greater than 0, and is not more
+        # than the quantity_current in the chosen batch
+        # IntVar objects reset their value to 0 if a non-integer is entered, 
+        # so this test checks the first two parameters
+        cur.execute('SELECT quantity_current FROM batches WHERE id = ?', (parameters["batchNumber"].get(),))
+        quantity = parameters["quantity"].get()
+        if quantity > 0 and int(cur.fetchone()[0]) >= quantity:
+            self.dataValid["quantity"] = True
+        else:
+            self.dataValid["quantity"] = False
+            allValid = False
+        conn.close()
+        # Ensure that the delivery date is formatted correctly (yyyy-mm-dd), 
+        # that all parts are possible (eg, no 13th month), and that it is not in 
+        # the future
+        if isDate(parameters["removalDate"].get()) and not dateInFuture(parameters["removalDate"].get()):
+            self.dataValid["removalDate"] = True
+        else:
+            self.dataValid["removalDate"] = False
+            allValid = False
+
+        # If all data is valid, display the confirmation screen
+        # If some data is invalid, identify the invalid data and highlight 
+        # those fields to the user.
+        if allValid:
+            self.submitQuery()
+            self.controller.showFrame(ResultsPage)
+        else:
+            self.displayInvalid()
+
+
+
+    def displayInvalid(self):
+        """ 
+        Check each datafield in turn, and if it has been flagged as invalid,
+        display an error message. Otherwise, remove existing error messages.
+        """        
+        if not self.dataValid["batchNumber"]:
+            self.entriesInvalid["batchNumber"]["text"] = "Batch number was not found in database."
+        else:
+            self.entriesInvalid["batchNumber"]["text"] = ""
+
+        if not self.dataValid["quantity"]:
+            self.entriesInvalid["quantity"]["text"]= "Quantity must be a positive whole number, less than the batches current quantity"
+        else:
+            self.entriesInvalid["quantity"]["text"] = ""
+
+        if not self.dataValid["removalDate"]:
+            self.entriesInvalid["removalDate"]["text"] = "Delivery date must be in the form YYYY-MM-DD"
+        else:
+            self.entriesInvalid["deliveryDate"]["text"] = ""
+
+
+    # construct and submit a query to the database
+    def submitQuery(self):
+        """
+        First remove a quantity from the batches database, then add a record to the
+        transactions database, save results to the controller, and then go to 
+        the results page.
+
+        The database updates are transactional. Failure will result in
+        successful updates being undone, details of the failure being saved to
+        the controller, and then going to the results page.
+        """        
+        parameters = self.controller.queryData["parameters"]
+        conn = sql.connect("dbs/stock_database.db")
+        cur = conn.cursor()
+        cur.execute("PRAGMA foreign_keys = ON")
+        batchId = parameters["batchNumber"].get()
+        try:
+            # Get the current quantity of the desired batch
+            cur.execute("SELECT quantity_current FROM batches WHERE id = ?", (batchId,))
+            # Calculate the new quantity
+            currentQuantity = cur.fetchone()[0]
+            newQuantity = currentQuantity - parameters["quantity"].get()
+            # Update the desired batch
+            cur.execute("UPDATE batches SET quantity_current = ? WHERE id = ?", (newQuantity, batchId))
+
+        except sql.Error:
+            # Save details of the error to the controller
             # exit the function
             conn.close()
-
-
-
-class RemovePage(ttk.Frame):
-    def __init__(self, parent, controller):
-        pass
+            print("batch query errored")
+            self.controller.queryData["outcome"] = FAILURE_STRING_G
+            return
+        cur.execute("SELECT stock_id FROM batches WHERE id = ?", (batchId,))
+        stockId = cur.fetchone()[0]
+        try:
+            # Record the removal in the transactions table
+            cur.execute(
+                "INSERT INTO transactions (batch_id, stock_id,transaction_type, quantity, occured_at, removal_reason) VALUES (?, ?, ?, ?, ?)",
+                (batchId,
+                stockId,
+                TRANSACTION_TYPE_REMOVAL_STRING,
+                parameters["quantity"].get(),
+                parameters["removalDate"].get(),
+                parameters["removalReason"].get())
+            )
+        except sql.Error:
+            conn.close()
+            print("addition query errored")
+            # Save details of the failure to the controller
+            self.controller.queryData["outcome"] = FAILURE_STRING_G
+            # exit the function
+        
+        conn.commit()
+        conn.close()
+        self.controller.queryData["outcome"] = SUCCESS_STRING_G
 
 class CheckBatchPage(ttk.Frame):
     def __init__(self, parent, controller):
@@ -307,152 +566,29 @@ class CheckStockPage(ttk.Frame):
 
 class ResultsPage(ttk.Frame):
     def __init__(self, parent, controller):
-        pass
-#######################
-## class RemoveQuery ##
-#######################
-# Class used to remove quantity from batches
-# Does not currently remove batches, as the current architecture holds on to
-# batch information for archival and auditing purposes - removal of batches is
-# a planned feature to add in subsequent updates.
-class RemoveQuery():
-    def __init__(self):
-        super().__init__()
-        self.__batchNumber = -1
-        self.__batchNumberValid = False
-        self.__quantity = -1
-        self.__quantityValid = False
-        self.__removalDate = ""
-        self.__removalDateValid = False
-        self.__removalReason = RemovalReason.USED
-        self.__removalReasonValid = False
+        super().__init__(parent)
+        self.controller = controller
+        self.header = ttk.Label(self, text="RESULT?").pack()
+        # Show the success or failure of the database operation
+        queryType = self.controller.queryData["type"]
+        outcome = self.controller.queryData["outcome"]
+        self.outcomeLabel = ttk.Label(self, text=f"The database operation {outcome}").pack()
+        self.parameterLabel = ttk.Label(self, text=f"")
+        # If add or remove operations succeeded, show the parameters that were 
+        # used. 
+        # This gives another opportunity to make sure that the data was 
+        # correct, and potentially to correct mistakes.
+        if outcome is not FAILURE_STRING_G and queryType is not TYPE_STRING_CHECK: 
+            self.parameterLabel["text"] = f"The following data was {OUTCOME_STRINGS[queryType]} the database: "
+            for k, v in self.controller.queryData["parameters"].items():
+                ttk.Label(self, text=f"{k} : {v.get()}").pack()
+            # If the query is an add, displays the new batch ID number to make future removals easier
+            if queryType is TYPE_STRING_ADD:
+                ttk.Label(self,text=f"The batch ID number is {self.controller.queryData["result"][0]}. Please record this for future transactions.")
+        # If the parameter was a database check, and the list of results is not too long, display them on screen.
+        elif queryType is TYPE_STRING_CHECK and len(self.controller.queryData["result"] <= MAX_ROWS_TO_DISPLAY):
+            pass
 
-
-    def displayOptions(self, window):
-        raise NotImplementedError("RemoveQuery.displayOptions not implemented")
-
-    def checkValid(self):
-        raise NotImplementedError("RemoveQuery.checkValid not implemented")
-    
-    def displayInvalid(self):
-        raise NotImplementedError("RemoveQuery.displayInvalid not implemented")
-    
-    def constructQuery(self):
-        raise NotImplementedError("RemoveQuery.constructQuery not implemented")
-
-    def updateDatabase(self):
-        raise NotImplementedError("RemoveQuery.updateDatabase not implemented")
-
-
-######################
-## class CheckQuery ##
-######################
-# Abstract class used to add the outputToCSV method to the 3 (as of 9/10/25)
-# xCheckQuery classes
-class CheckQuery():
-    @abstractmethod
-    def outputToCSV(self):
-        pass
-
-
-#################################
-## class TransactionCheckQuery ##
-#################################
-# Class used to get information about specific transations
-class TransactionCheckQuery(CheckQuery):
-    def __init__(self):
-        super().__init__(self)
-        self.__transactionType = TransactionType.ADD
-        self.__batchNumber = -1
-        self.__batchNumberValid = False
-        self.__stockName = ""
-        self.__stockNameValid = False
-        self.__dateRange = ["", ""]
-        self.__dateRangeValid = False
-        self.__removalReason = RemovalReason.USED
-        self.__removalReasonValid = False
-
-    def displayOptions(self, window):
-        raise NotImplementedError("TransactionCheckQuery.displayOptions not implemented")
-
-    def checkValid(self):
-        raise NotImplementedError("TransactionCheckQuery.checkValid not implemented")
-    
-    def displayInvalid(self):
-        raise NotImplementedError("TransactionCheckQuery.displayInvalid not implemented")
-    
-    def constructQuery(self):
-        raise NotImplementedError("TransactionCheckQuery.constructQuery not implemented")
-
-    def updateDatabase(self):
-        raise NotImplementedError("TransactionCheckQuery.updateDatabase not implemented")
-    
-    def outputToCSV(self):
-        raise NotImplementedError("TransactionCheckQuery.outputToCSV not implemented")
-
-
-###########################
-## class BatchCheckQuery ##
-###########################
-# Class used to get information about specific batches, or to get a batch
-# number.
-class BatchCheckQuery(CheckQuery):
-    def __init__(self):
-        super().__init__(self)
-        self.__batchNumber = -1
-        self.__batchNumberValid = False
-        self.__stockName = ""
-        self.__stockNameValid = False
-        self.__dateRange = ["", ""]
-        self.__dateRangeValid = False
-
-    def displayOptions(self, window):
-        raise NotImplementedError("BatchCheckQuery.displayOptions not implemented")
-
-    def checkValid(self):
-        raise NotImplementedError("BatchCheckQuery.checkValid not implemented")
-    
-    def displayInvalid(self):
-        raise NotImplementedError("BatchCheckQuery.displayInvalid not implemented")
-    
-    def constructQuery(self):
-        raise NotImplementedError("BatchCheckQuery.constructQuery not implemented")
-
-    def updateDatabase(self):
-        raise NotImplementedError("BatchCheckQuery.updateDatabase not implemented")
-    
-    def outputToCSV(self):
-        raise NotImplementedError("BatchCheckQuery.outputToCSV not implemented")
-
-###########################
-## class StockCheckQuery ##
-###########################
-# Class used to get information about stock at various points in time.
-class StockCheckQuery(CheckQuery):
-    def __init__(self):
-        super().__init__(self)
-        self.__allStock = False
-        self.__stockList = [""]
-        self.__stockListValid = False
-        self.__atDate = ""
-        self.__atDateValid = False
-
-    def displayOptions(self, window):
-        raise NotImplementedError("StockCheckQuery.displayOptions not implemented")
-
-    def checkValid(self):
-        raise NotImplementedError("StockCheckQuery.checkValid not implemented")
-    
-    def displayInvalid(self):
-        raise NotImplementedError("StockCheckQuery.displayInvalid not implemented")
-    
-    def constructQuery(self):
-        raise NotImplementedError("StockCheckQuery.constructQuery not implemented")
-
-    def updateDatabase(self):
-        raise NotImplementedError("StockCheckQuery.updateDatabase not implemented")
-    
-    def outputToCSV(self):
-        raise NotImplementedError("StockCheckQuery.outputToCSV not implemented")
-    
-    
+        # provide a button to return to the main page
+        self.exitButton = ttk.Button(self, text="Return to Main Page", command=lambda: self.controller.showFrame(MainPage)).pack()
+        # If the query type was check, provide an option to output the results to a csv file
