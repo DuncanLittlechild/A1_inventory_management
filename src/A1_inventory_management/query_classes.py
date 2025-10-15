@@ -27,12 +27,7 @@ OUTCOME_STRINGS = {
 
 MAX_ROWS_TO_DISPLAY = 10
 
-
-########################
-## enum RemovalReason ##
-########################
-# Enum used to record the reason for goods being removed from a batch
-RemovalReason = [
+REMOVAL_REASON = [
     # Display text  # Database record
     ("Used",        "used"       ),
     ("Out of Date", "out_of_date"),
@@ -40,6 +35,7 @@ RemovalReason = [
     ("Lost",        "lost"       ),
     ("Destroyed",   "destroyed"  )
 ]
+
 
 ##########################
 ## enum TransactionType ##
@@ -399,7 +395,7 @@ class RemovePage(ttk.Frame):
             "removalReason": []
         }
         self.entries["removalReason"] = [
-            ttk.Radiobutton(self, text=f"{RemovalReason[i][0]}", value=f"{RemovalReason[i][1]}", variable=parameters["removalReason"]) for i in range(len(RemovalReason))
+            ttk.Radiobutton(self, text=f"{REMOVAL_REASON[i][0]}", value=f"{REMOVAL_REASON[i][1]}", variable=parameters["removalReason"]) for i in range(len(REMOVAL_REASON))
         ]
         # store for input error warnings for each member of self.data
         # These will be modified to display text if any fields are found to 
@@ -586,8 +582,251 @@ class RemovePage(ttk.Frame):
         self.controller.queryData["outcome"] = SUCCESS_STRING_G
 
 class CheckBatchPage(ttk.Frame):
+    """
+    Page frame used to construct a query to get information from the
+    batches table
+
+    """    
     def __init__(self, parent, controller):
-        pass
+        super().__init__(parent)
+        self.controller = controller
+        # Datafields to store information for the sqlite query
+        self.controller.queryData["type"] = TYPE_STRING_CHECK
+        self.controller.queryData["parameters"] = {
+            "batchId" : tk.IntVar(),
+            "name" : tk.StringVar(),
+            "deliveryDateRange" : [tk.StringVar(), tk.StringVar()],
+            "useByDateRange" : [tk.StringVar(), tk.StringVar()],
+            "recordedDateRange" : [tk.StringVar(), tk.StringVar()],
+        }
+
+        # assign this variable to shorten the path
+        parameters = self.controller.queryData["parameters"]
+        # datafields to record if the respective variable field is valid
+        self.dataUsed = {
+            "batchId" : tk.BooleanVar(),
+            "name" : tk.BooleanVar(value=True),
+            "deliveryDateRange" : tk.BooleanVar(),
+            "useByDateRange" : tk.BooleanVar(),
+            "recordedDateRange" : tk.BooleanVar(),
+        }
+
+        self.checkBoxes = {
+            "batchId" : ttk.Checkbutton(self, text="Search for Specific Batch", command= self.toggleBatchSearch(), variable=self.dataUsed["batchId"]),
+            "name" : ttk.Checkbutton(self, text="Search by Stock Name", command= self.toggleName(), variable=self.dataUsed["name"]),
+            "deliveryDateRange" : ttk.Checkbutton(self, text="Search by delivery date", command= self.toggleRange("deliveryDateRange"), variable=self.dataUsed["deliveryDateRange"]),
+            "useByDateRange" : ttk.Checkbutton(self, text="Search by use by date", command= self.toggleRange("useByDateRange"), variable=self.dataUsed["useByDateRange"]),
+            "recordedDateRange" : ttk.Checkbutton(self, text="Search by recorded date", command= self.toggleRange("recordedDateRange"), variable=self.dataUsed["recordedDateRange"])
+        }
+
+       # Labels for each field
+        self.labels = {
+            "batchId": ttk.Label(self, text="Batch ID"),
+            "name": ttk.Label(self, text="Name/Id Number of Good"),
+            "deliveryDateRange": ttk.Label(self, text="Delivery Date Range (YYYY-MM-DD)"),
+            "useByDateRange": ttk.Label(self, text="Use By Date Range (YYYY-MM-DD)"),
+            "recordedDateRange": ttk.Label(self, text="Recorded Date Range (YYYY-MM-DD)")
+        }
+
+        # Entries for each field
+        self.entries = {
+            "batchId": ttk.Entry(self, textvariable=parameters["batchId"]),
+            "name": ttk.Entry(self, textvariable=parameters["name"]),
+            "deliveryDateRange": [ttk.Entry(self, textvariable=parameters["deliveryDateRange"][0]),
+                                ttk.Entry(self, textvariable=parameters["deliveryDateRange"][1])],
+            "useByDateRange": [ttk.Entry(self, textvariable=parameters["useByDateRange"][0]),
+                            ttk.Entry(self, textvariable=parameters["useByDateRange"][1])],
+            "recordedDateRange": [ttk.Entry(self, textvariable=parameters["recordedDateRange"][0]),
+                                ttk.Entry(self, textvariable=parameters["recordedDateRange"][1])]
+        }
+       
+        # Loop to display checkboxes, labels, and entries
+        # The checkboxes are used to toggle the visibility of the labels and entries
+        # Labels and entries are packed to lock in their relative positions on
+        # the page, then forgotten if they are not being used 
+        for dataField in self.checkBoxes:
+            self.checkBoxes[dataField].pack()
+            self.labels[dataField].pack()
+            entry = self.entries[dataField]
+            if isinstance(entry, list):
+                entry[0].pack(side=tk.LEFT, anchor=tk.CENTER)
+                entry[1].pack(side=tk.RIGHT, anchor=tk.CENTER)
+            else:
+                entry.pack()
+            # if the data is not currently being used, hide the label and entry
+            if not self.dataUsed[dataField].get():
+                self.checkBoxes[dataField].pack_forget()
+                self.labels[dataField].pack_forget()
+                if isinstance(entry, list):
+                    entry[0].pack_forget()
+                    entry[1].pack_forget()
+                else:
+                    entry.pack_forget()
+
+        ttk.Button(self, text="Submit details", command=self.submitQuery).pack()
+
+
+    # construct and submit a query to the database
+    def submitQuery(self):
+        """
+        Perform a select query on the database. If it doesn't work, remain on 
+        the previous screen. If it does, go to the results screen.
+
+        As these functions do not modify the database in any way, they did not
+        need to additional layers of protection provided by the validation 
+        step.
+        """  
+        # Check to see at least one parameter has been entered. If none have 
+        # been entered, exit the function   
+        noneUsed = True
+        for b in self.dataUsed.values():
+            if b.get():
+                noneUsed = False
+                break
+        if noneUsed:
+            return
+        
+        parameters = self.controller.queryData["parameters"]
+
+        # Remove leading zeroes from dates
+        deliveryDate = removeLeadingZeroes(parameters["deliveryDate"].get())
+        useByDate = removeLeadingZeroes(parameters["useByDate"].get())
+
+        conn = sql.connect("dbs/stock_database.db")
+        cur = conn.cursor()
+        cur.execute("PRAGMA foreign_keys = ON")
+
+        # Builds a sql SELECT string a bit at a time, then a tuple to insert
+        # the relevant values
+        queryString = "SELECT * FROM batches WHERE ("
+        queryParameters = []
+        # if batchId is used, then that is the only parameter needed for the query
+        if self.dataUsed["batchId"].get():
+            queryString = queryString + "batch_id = ?)"
+            queryParameters.append(parameters["batchId"].get())
+        else:
+            if self.dataUsed["name"].get():
+                queryString = queryString +"name = ?"
+                queryParameters.append(parameters["name"].get())
+            if self.dataUsed["deliveryDateRange"].get():
+                queryString = queryString +" AND delivered_at <= ? AND delivered_at >= ?"
+                queryParameters.append(parameters["deliveryDateRange"][0].get())
+                queryParameters.append(parameters["deliveryDateRange"][1].get())
+            if self.dataUsed["deliveryDateRange"].get():
+                queryString = queryString +" AND delivered_at <= ? AND delivered_at >= ?"
+                queryParameters.append(parameters["deliveryDateRange"][0].get())
+                queryParameters.append(parameters["deliveryDateRange"][1].get())
+
+        stockId = parameters["name"].get()
+        try:
+            # if a name has been used, get the id
+            if not parameters["name"].get().isnumeric():
+                cur.execute("SELECT id FROM stock_names WHERE name = ?",(parameters["name"].get().lower(),))
+                stockId = cur.fetchone()[0]
+
+            # Add the new batch of stock to the batches table
+            cur.execute(
+                "INSERT INTO batches (stock_id, quantity_initial, quantity_current, delivered_at, use_by) VALUES (?, ?, ?, ?, ?)", 
+                (stockId, 
+                parameters["quantity"].get(), 
+                parameters["quantity"].get(), 
+                deliveryDate, 
+                useByDate)
+            )
+        except sql.Error:
+            conn.close()
+            print("batch query errored")
+            # Save details of the error to the controller
+            self.controller.queryData["outcome"] = FAILURE_STRING_G
+            return
+        
+        # record the batchId outside of the try except loop to allow the 
+        # prior transaction to be undone.
+        batchId = cur.lastrowid
+        try:
+            # Record the addition in the transactions table
+            cur.execute(
+                "INSERT INTO transactions (transaction_type, batch_id, stock_id, quantity, occured_at) VALUES (?, ?, ?, ?, ?)",
+                (                TRANSACTION_TYPE_ADDITION_STRING,
+                batchId,
+                stockId,
+                parameters["quantity"].get(),
+                deliveryDate)
+            )
+        except sql.Error:
+            conn.close()
+            print("addition query errored")
+
+            # Save details of the failure to the controller
+            self.controller.queryData["outcome"] = FAILURE_STRING_G
+
+            # exit the function
+            return
+        conn.commit()
+        conn.close()
+        self.controller.queryData["result"].append(batchId)
+        self.controller.queryData["outcome"] = SUCCESS_STRING_G
+    
+    def toggleBatchSearch(self):
+        """
+        Toggles all checkboxes being invisible if searching for one specific
+        batch, or all checkboxes being visible if not.
+        As each batch number has but one match, refining by delivery date is pointless
+        """ 
+        # If the batchnumber label is visible, toggle it off and display all
+        # other labels instead       
+        if self.labels["batchId"].winfo_ismapped():
+            self.labels["batchId"].pack_forget()
+            self.entries["batchId"].pack_forget()
+            for checkbox in self.checkBoxes.values():
+                checkbox.pack()
+        
+        # If the batchNumber label is not visible, toggle it on and hide all 
+        # other labels.
+        # Also set dataUsed for all parameters save batchId to 
+        # false.
+        else:
+            for b in self.dataUsed:
+                if b is not "batchId":
+                    self.dataUsed[b]["value"] = False
+
+            self.labels["batchId"].pack()
+            self.entries["batchId"].pack()
+            for c in self.checkBoxes:
+                if c is not "batchId":
+                    self.checkBoxes[c].pack_forget()
+        
+        self.toggleName()
+        self.toggleDateRange("deliveryDateRange")
+        self.toggleDateRange("useByDateRange")
+        self.toggleDateRange("recordedDateRange")
+
+
+    def toggleName(self):
+        """Toggle visibility of the name field on or off
+        """        
+        if self.labels["name"].winfo_ismapped():
+            self.labels["name"].pack_forget()
+            self.entries["name"].pack_forget()
+        else:
+            self.labels["name"].pack()
+            self.entries["name"].pack()
+
+    def toggleDateRange(self, dateRange):
+        """Toggle visibility of a dateRange on or off
+
+        Args:
+            dateRange (string): string identifying which daterange is to be toggled
+        """        
+        if self.labels[dateRange].winfo_ismapped():
+            self.labels[dateRange].pack_forget()
+            self.entries[dateRange][0].pack_forget()
+            self.entries[dateRange][1].pack_forget()
+        else:
+            self.labels[dateRange].pack()
+            self.entries[dateRange][0].pack(side=tk.LEFT, anchor=tk.CENTER)
+            self.entries[dateRange][1].pack(side=tk.LEFT, anchor=tk.CENTER)
+
     
 class CheckTransactionPage(ttk.Frame):
     def __init__(self, parent, controller):
