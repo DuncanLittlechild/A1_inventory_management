@@ -14,28 +14,19 @@ CREATE TABLE IF NOT EXISTS batches (
   FOREIGN KEY (stock_id) REFERENCES stock_names(id) ON DELETE CASCADE
 );
 
-CREATE TABLE IF NOT EXISTS additions (
+CREATE TABLE IF NOT EXISTS transactions (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
+  transaction_type TEXT NOT NULL CHECK (transaction_type IN ('addition', 'removal')),
   batch_id INTEGER NOT NULL,
   stock_id INTEGER NOT NULL,
   quantity INTEGER NOT NULL,
-  added_at TEXT CHECK (added_at LIKE '%-%-%'),
-  recorded_in_database TEXT DEFAULT (datetime('now')),
-  FOREIGN KEY (batch_id) REFERENCES batches(id) ON DELETE CASCADE,
-  FOREIGN KEY (stock_id) REFERENCES stock_names(id) ON DELETE CASCADE
-);
-
-CREATE TABLE IF NOT EXISTS removals (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  batch_id INTEGER NOT NULL,
-  stock_id INTEGER NOT NULL,
-  quantity INTEGER NOT NULL,
-  reason TEXT CHECK (reason IN ('used',
+  removal_reason TEXT CHECK (removal_reason IN ('N/A',
+                                'used',
                                 'out_of_date',
                                 'returned',
                                 'lost',
-                                'destroyed')),
-  removed_at TEXT CHECK (removed_at LIKE '%-%-%'),
+                                'destroyed')) DEFAULT ('N/A'),
+  occured_at TEXT CHECK (occured_at LIKE '%-%-%'),
   recorded_in_database TEXT DEFAULT (datetime('now')),
   FOREIGN KEY (batch_id) REFERENCES batches(id) ON DELETE CASCADE,
   FOREIGN KEY (stock_id) REFERENCES stock_names(id) ON DELETE CASCADE
