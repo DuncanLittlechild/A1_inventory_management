@@ -6,8 +6,8 @@ CREATE TABLE IF NOT EXISTS stock_names (
 CREATE TABLE IF NOT EXISTS batches (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   stock_id INTEGER NOT NULL,
-  quantity_initial INTEGER NOT NULL,
-  quantity_current INTEGER NOT NULL,
+  quantity_initial INTEGER NOT NULL CHECK (quantity_initial >= 0),
+  quantity_current INTEGER NOT NULL CHECK (quantity_current >= 0),
   delivered_at TEXT CHECK (delivered_at LIKE '%-%-%'),
   recorded_in_database TEXT DEFAULT (datetime('now')),
   use_by TEXT CHECK (use_by LIKE '%-%-%'),
@@ -19,8 +19,9 @@ CREATE TABLE IF NOT EXISTS transactions (
   transaction_type TEXT NOT NULL CHECK (transaction_type IN ('addition', 'removal')),
   batch_id INTEGER NOT NULL,
   stock_id INTEGER NOT NULL,
-  quantity INTEGER NOT NULL,
-  removal_reason TEXT CHECK (removal_reason IN ('N/A',
+  quantity INTEGER NOT NULL CHECK (quantity >= 0),
+  removal_reason TEXT CHECK (removal_reason IN (
+                                'N/A',
                                 'used',
                                 'out_of_date',
                                 'returned',
