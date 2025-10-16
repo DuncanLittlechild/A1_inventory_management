@@ -30,3 +30,7 @@ def addLeadingZeroes(date):
 
 def dateLessThan(date1, date2):
     return datetime.strptime(date1, "%Y-%m-%d").date() < datetime.strptime(date2, "%Y-%m-%d").date()
+
+def getCurrentDateTime():
+    now = datetime.now()
+    return now.strftime("%Y_%m_%d_%H_%M_%S")

@@ -2,7 +2,7 @@
 # and execute the sqlite3 queries.
 
 # See the UML diagram for a clearer picture of their relationship to each other
-from enum import Enum
+import os
 import tkinter as tk
 from tkinter import ttk
 from tkinter import filedialog as fd
@@ -11,7 +11,7 @@ import sqlite3 as sql
 from pandas import read_sql_query
 from pandastable import Table, TableModel
 
-from A1_inventory_management.utils.query_classes_valid import isDate, dateInFuture, addLeadingZeroes, dateLessThan
+from A1_inventory_management.utils.datetime_helpers import isDate, dateInFuture, addLeadingZeroes, dateLessThan, getCurrentDateTime
 
 TRANSACTION_TYPE_ADDITION_STRING = 'addition'
 TRANSACTION_TYPE_REMOVAL_STRING = 'removal'
@@ -39,18 +39,6 @@ REMOVAL_REASON = {
     "Lost": "lost",
     "Destroyed": "destroyed"  
 }
-
-
-##########################
-## enum TransactionType ##
-##########################
-# Enum used to record the type of transaction data desired
-class TransactionType(Enum):
-    ADD    = 0
-    REMOVE = 1
-    BOTH   = 2
-
-
 
 
 ###############
@@ -84,7 +72,7 @@ class App(tk.Tk):
             "type" : "Not started",
             "outcome": "Not started",
             "parameters" : {},
-            "result" : []
+            "result" : None
         }
 
         self.showFrame(MainPage)
@@ -759,10 +747,16 @@ class CheckBatchPage(ttk.Frame):
         self.backButton = ttk.Button(self, text="Back", command=lambda: self.controller.showFrame(MainPage))
 
         self.backButton.pack()
+        
+        # Button to export to csv
+        self.csvButton = ttk.Button(self, text="Export results to .csv", command= self.exportToCsv)
+        self.csvButton.pack()
+        self.csvButton.pack_forget()
+
 
         # Frame to hold the results of the last submitted query
         self.resultsFrame = ttk.Frame(self)
-        self.resultsFrame.pack(fill="both", expand=True)
+
         # Datafield that will hold the pandastable to show the results when/if it is generated
         self.resultsTable = None
 
@@ -770,11 +764,11 @@ class CheckBatchPage(ttk.Frame):
     # construct and submit a query to the database
     def submitQuery(self):
         """
-        Perform a select query on the database. If it doesn't work, remain on 
-        the previous screen. If it does, go to the results screen.
+        Constructs a SELECT query based on the data entered and chosen. If no
+        data is found, an error message pops up.
 
         As these functions do not modify the database in any way, they did not
-        need to additional layers of protection provided by the validation 
+        need the additional layers of protection provided by the validation 
         step.
         """  
         # Check to see at least one parameter has been entered. If none have 
@@ -812,7 +806,7 @@ class CheckBatchPage(ttk.Frame):
                 if not stockId.isnumeric():
                     cur.execute("SELECT id FROM stock_names WHERE name = ?", (parameters["name"].get(),))
                     stockId = cur.fetchone()[0]
-                queryString = queryString +"id = ?"
+                queryString = queryString +"stock_id = ?"
                 queryParameters.append(stockId)
                 addAnd = " AND "
             
@@ -831,18 +825,35 @@ class CheckBatchPage(ttk.Frame):
         queryString = queryString + ")"
 
         # Use pandas to read the select query
-        result = read_sql_query(queryString, conn, params=tuple(queryParameters))
-        if not result.empty:
+        parameters["result"] = read_sql_query(queryString, conn, params=tuple(queryParameters))
+        if not parameters["result"].empty:
+            # show export to csv button
+            self.csvButton.pack()
+            # show the results frame
+            self.resultsFrame.pack(fill="both", expand=True)
             # Turn result pandas dataframe into a pandastable
-            self.resultsTable = Table(self.resultsFrame, dataframe=result, showtoolbar=True, showstatusbar=True)
+            self.resultsTable = Table(self.resultsFrame, dataframe=parameters["result"], editable=False, showstatusbar=True)
             # Ensure that the table has completed all setup before displaying
             self.resultsTable.update_idletasks()
             self.resultsTable.show()
             self.resultsTable.redraw()
+            self.resultsTable.autoResizeColumns()
         else:
             showerror(title="Check Failed", message="No data found matching this query")
         conn.close()
 
+    def exportToCsv(self):
+        # open window to choose folder location
+        fileName = fd.asksaveasfilename(
+            defaultextension=".csv",
+            filetypes=[("CSV files", "*.csv"), ("All files", "*.*")],
+            title="Save exported query"
+        )
+
+        if fileName:
+            # save file with set name
+            self.resultsTable.model.df.to_csv(fileName, index=False)
+            showinfo(title="Export complete", message=f"Query results exported to {fileName}.")
 
     def toggleBatchSearch(self):
         """
