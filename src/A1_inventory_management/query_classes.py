@@ -600,72 +600,116 @@ class CheckBatchPage(ttk.Frame):
             "batchId" : tk.IntVar(),
             "name" : tk.StringVar(),
             "delivered_at" : [tk.StringVar(), tk.StringVar()],
-            "use_byRange" : [tk.StringVar(), tk.StringVar()],
+            "use_by" : [tk.StringVar(), tk.StringVar()],
             "recorded_in_database" : [tk.StringVar(), tk.StringVar()],
         }
-
         # assign this variable to shorten the path
         parameters = self.controller.queryData["parameters"]
-        # datafields to record if the respective variable field is valid
+
+        # datafields to record if the respective variable field is used
+        # This doubles as a flag to show that partiular field
         self.dataUsed = {
             "batchId" : tk.BooleanVar(),
             "name" : tk.BooleanVar(value=True),
             "delivered_at" : tk.BooleanVar(),
-            "use_byRange" : tk.BooleanVar(),
+            "use_by" : tk.BooleanVar(),
             "recorded_in_database" : tk.BooleanVar(),
         }
+        
+        # Frames to seperate the two types of batch query: solely batchId, or
+        # other
+        self.mainFrames = {
+            "batchId" : ttk.Frame(self),
+            "other" : ttk.Frame(self)
+        }
+
+        # subframes to seperate the different query fields.
+        self.subFrames = {
+            "name" : ttk.Frame(self.mainFrames["other"]),
+            "delivered_at" : ttk.Frame(self.mainFrames["other"]),
+            "use_by" : ttk.Frame(self.mainFrames["other"]),
+            "recorded_in_database" : ttk.Frame(self.mainFrames["other"])
+        }
+
 
         # Checkboxes to choose which variables to use for the search
         self.checkBoxes = {
-            "batchId" : ttk.Checkbutton(self, text="Search for Specific Batch", command= self.toggleBatchSearch, variable=self.dataUsed["batchId"]),
-            "name" : ttk.Checkbutton(self, text="Search by Stock Name", command= self.toggleName, variable=self.dataUsed["name"]),
-            "delivered_at" : ttk.Checkbutton(self, text="Search by delivery date", command=lambda: self.toggleDateRange("delivered_at"), variable=self.dataUsed["delivered_at"]),
-            "use_byRange" : ttk.Checkbutton(self, text="Search by use by date", command=lambda: self.toggleDateRange("use_byRange"), variable=self.dataUsed["use_byRange"]),
-            "recorded_in_database" : ttk.Checkbutton(self, text="Search by recorded date", command=lambda: self.toggleDateRange("recorded_in_database"), variable=self.dataUsed["recorded_in_database"])
+            "batchId" : ttk.Checkbutton(
+                self.mainFrames["batchId"],
+                text="Search for Specific Batch",
+                command= self.toggleBatchSearch,
+                variable=self.dataUsed["batchId"]),
+            "name" : ttk.Checkbutton(
+                self.subFrames["name"], 
+                text="Search by Stock Name", 
+                command= self.toggleName, 
+                variable=self.dataUsed["name"]),
+            "delivered_at" : ttk.Checkbutton(
+                self.subFrames["delivered_at"], 
+                text="Search by delivery date", 
+                command=lambda: self.toggleDateRange("delivered_at"), 
+                variable=self.dataUsed["delivered_at"]),
+            "use_by" : ttk.Checkbutton(
+                self.subFrames["use_by"], 
+                text="Search by use by date", 
+                command=lambda: self.toggleDateRange("use_by"), 
+                variable=self.dataUsed["use_by"]),
+            "recorded_in_database" : ttk.Checkbutton(
+                self.subFrames["recorded_in_database"], 
+                text="Search by date batch recorded", 
+                command=lambda: self.toggleDateRange("recorded_in_database"), 
+                variable=self.dataUsed["recorded_in_database"])
         }
-
-       # Labels for each field
+       # Labelframes for each field
         self.labels = {
-            "batchId": ttk.Label(self, text="Batch ID"),
-            "name": ttk.Label(self, text="Name/Id Number of Good"),
-            "delivered_at": ttk.Label(self, text="Delivery Date Range (YYYY-MM-DD)"),
-            "use_byRange": ttk.Label(self, text="Use By Date Range (YYYY-MM-DD)"),
-            "recorded_in_database": ttk.Label(self, text="Recorded Date Range (YYYY-MM-DD)")
+            "batchId": ttk.LabelFrame(self.mainFrames["batchId"], text="Batch ID"),
+            "name": ttk.LabelFrame(self.subFrames["name"], text="Name/Id Number of Good"),
+            "delivered_at": ttk.LabelFrame(self.subFrames["delivered_at"], text="Delivery Date Range (YYYY-MM-DD)"),
+            "use_by": ttk.LabelFrame(self.subFrames["use_by"], text="Use By Date Range (YYYY-MM-DD)"),
+            "recorded_in_database": ttk.LabelFrame(self.subFrames["recorded_in_database"], text="Recorded Date Range (YYYY-MM-DD)")
         }
 
-        # Entries for each field
+        # Entries for each field, bound to the requisite LabelFrame
         self.entries = {
-            "batchId": ttk.Entry(self, textvariable=parameters["batchId"]),
-            "name": ttk.Entry(self, textvariable=parameters["name"]),
-            "delivered_at": [ttk.Entry(self, textvariable=parameters["delivered_at"][0]),
-                                ttk.Entry(self, textvariable=parameters["delivered_at"][1])],
-            "use_byRange": [ttk.Entry(self, textvariable=parameters["use_byRange"][0]),
-                            ttk.Entry(self, textvariable=parameters["use_byRange"][1])],
-            "recorded_in_database": [ttk.Entry(self, textvariable=parameters["recorded_in_database"][0]),
-                                ttk.Entry(self, textvariable=parameters["recorded_in_database"][1])]
+            "batchId": ttk.Entry(self.labels["batchId"], textvariable=parameters["batchId"]),
+            "name": ttk.Entry(self.labels["name"], textvariable=parameters["name"]),
+            "delivered_at": [
+                ttk.Entry(self.labels["delivered_at"], textvariable=parameters["delivered_at"][0]),
+                ttk.Entry(self.labels["delivered_at"], textvariable=parameters["delivered_at"][1])
+            ],
+            "use_by": [
+                ttk.Entry(self.labels["use_by"], textvariable=parameters["use_by"][0]),
+                ttk.Entry(self.labels["use_by"], textvariable=parameters["use_by"][1])
+            ],
+            "recorded_in_database": [
+                ttk.Entry(self.labels["recorded_in_database"], textvariable=parameters["recorded_in_database"][0]),
+                ttk.Entry(self.labels["recorded_in_database"], textvariable=parameters["recorded_in_database"][1])
+            ]
         }
        
-        # Loop to display checkboxes, labels, and entries
+        # Loop to display page elements
         # The checkboxes are used to toggle the visibility of the labels and entries
         # Labels and entries are packed to lock in their relative positions on
         # the page, then forgotten if they are not being used 
-        for dataField in self.checkBoxes:
-            self.checkBoxes[dataField].pack()
-            self.labels[dataField].pack()
-            entry = self.entries[dataField]
-            if isinstance(entry, list):
-                entry[0].pack()
-                entry[1].pack()
+        for d in self.mainFrames.values():
+            d.pack()
+        for d in self.subFrames.values():
+            d.pack()
+        for d in self.checkBoxes.values():
+            d.pack()
+        for d in self.labels.values():
+            d.pack()
+        for d in self.entries.values():
+            if isinstance(d, list):
+                d[0].pack()
+                d[1].pack()
             else:
-                entry.pack()
-            # if the data is not currently being used, hide the label and entry
-            if not self.dataUsed[dataField].get():
-                self.labels[dataField].pack_forget()
-                if isinstance(entry, list):
-                    entry[0].pack_forget()
-                    entry[1].pack_forget()
-                else:
-                    entry.pack_forget()
+                d.pack()
+
+        # hide unused datafields
+        for d in self.dataUsed:
+            if not self.dataUsed[d].get():
+                self.labels[d].pack_forget()
 
         self.submitDetails = ttk.Button(self, text="Submit details", command=self.submitQuery)
         self.submitDetails.pack()
@@ -744,83 +788,59 @@ class CheckBatchPage(ttk.Frame):
     
     def toggleBatchSearch(self):
         """
-        Toggles all checkboxes being invisible if searching for one specific
-        batch, or all checkboxes being visible if not.
-        As each batch number has but one match, refining by delivery date is pointless
+        Toggles the others mainFrame off if searching for specific
+        batch, or on if not.
+        As each batch number has but one match, refining is not necessary
         """ 
         # If the batchnumber label is visible, toggle it off and display all
-        # other labels instead       
+        # subframes
         if self.labels["batchId"].winfo_ismapped():
             self.labels["batchId"].pack_forget()
-            self.entries["batchId"].pack_forget()
-            self.dataUsed["name"].set(True)
-            for checkbox in self.checkBoxes.values():
-                checkbox.pack()
-            self.toggleName(False)
+            for f in self.subFrames.values():
+                f.pack()
 
         # If the batchNumber label is not visible, toggle it on and hide all 
-        # other labels.
-        # Also set dataUsed for all parameters save batchId to 
-        # false.
+        # subframes
         else:
-            for b in self.dataUsed:
-                if b != "batchId":
-                    self.dataUsed[b].set(False)
             self.labels["batchId"].pack()
-            self.entries["batchId"].pack()
-            for c in self.checkBoxes:
-                if c != "batchId":
-                    self.checkBoxes[c].pack_forget()
-            self.toggleName(True)
-            self.toggleDateRange("delivered_at", True)
-            self.toggleDateRange("use_byRange", True)
-            self.toggleDateRange("recorded_in_database", True)
+            for f in self.subFrames.values():
+                f.pack_forget()
 
 
-    def toggleName(self, makeInvisible = None):
-        """Toggle visibility of the name field on or off
-        """       
-        if makeInvisible is None:
-            makeInvisible = self.labels["name"].winfo_ismapped()
-        if makeInvisible:
-            self.labels["name"].pack_forget()
-            self.entries["name"].pack_forget()
-        else:
+    def toggleName(self, makeVisible = None):
+        """Toggle visibility of the name field on or off, or set it if makeInvsisible is given a value.
+
+        Args:
+            makeVisible(bool): Boolean that on None toggles, on True turns 
+            DateRange on, and on False turns DateRange off
+        """     
+        # if no makeVisible is entered, default to toggle
+        if makeVisible is None:
+            makeVisible = not self.labels["name"].winfo_ismapped()
+
+        if makeVisible:
             self.labels["name"].pack()
-            self.entries["name"].pack()
-        self.moveSubmitButton()
+        else:
+            self.labels["name"].pack_forget()
 
-    def toggleDateRange(self, dateRange, makeInvisible = None):
+    def toggleDateRange(self, dateRange, makeVisible = None):
         """Toggle visibility of a dateRange on or off
 
         Args:
             dateRange (string): string identifying which daterange is to be toggled
 
-            makeInvisible(bool): Boolean that on None toggles, on True turns 
+            makeVisible(bool): Boolean that on None toggles, on True turns 
                         DateRange on, and on False turns DateRange off
         """
         # If no mode entered, default to toggle
-        if makeInvisible is None:
-            mode = self.labels[dateRange].winfo_ismapped()
+        if makeVisible is None:
+            makeVisible = not self.labels[dateRange].winfo_ismapped()
 
-        if makeInvisible:
-            self.labels[dateRange].pack_forget()
-            self.entries[dateRange][0].pack_forget()
-            self.entries[dateRange][1].pack_forget()
-        else:
+        if makeVisible:
             self.labels[dateRange].pack()
-            self.entries[dateRange][0].pack()
-            self.entries[dateRange][1].pack()
-        self.moveSubmitButton()
+        else:
+            self.labels[dateRange].pack_forget()
     
-    def moveSubmitButton(self):
-        """Simple function to toggle the submit button, keeping it on the bottom
-        """        
-        # Make sure the submit button is still at the bottom
-        self.submitDetails.pack_forget()
-        self.submitDetails.pack()
-
-
     
 class CheckTransactionPage(ttk.Frame):
     def __init__(self, parent, controller):
