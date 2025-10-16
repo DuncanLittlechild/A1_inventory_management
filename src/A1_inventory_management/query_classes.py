@@ -5,10 +5,13 @@
 from enum import Enum
 import tkinter as tk
 from tkinter import ttk
-from tkinter.messagebox import showerror, showinfo
+from tkinter import filedialog as fd
+from tkinter.messagebox import showerror, showinfo, askyesno
 import sqlite3 as sql
+from pandas import read_sql_query
+from pandastable import Table, TableModel
 
-from A1_inventory_management.utils.query_classes_valid import isDate, dateInFuture, removeLeadingZeroes, dateLessThan
+from A1_inventory_management.utils.query_classes_valid import isDate, dateInFuture, addLeadingZeroes, dateLessThan
 
 TRANSACTION_TYPE_ADDITION_STRING = 'addition'
 TRANSACTION_TYPE_REMOVAL_STRING = 'removal'
@@ -28,14 +31,14 @@ OUTCOME_STRINGS = {
 
 MAX_ROWS_TO_DISPLAY = 10
 
-REMOVAL_REASON = [
+REMOVAL_REASON = {
     # Display text  # Database record
-    ("Used",        "used"       ),
-    ("Out of Date", "out_of_date"),
-    ("Returned",    "returned"   ),
-    ("Lost",        "lost"       ),
-    ("Destroyed",   "destroyed"  )
-]
+    "Used": "used",
+    "Out of Date": "out_of_date",
+    "Returned": "returned",
+    "Lost": "lost",
+    "Destroyed": "destroyed"  
+}
 
 
 ##########################
@@ -186,6 +189,11 @@ class AddPage(ttk.Frame):
 
         ttk.Button(self, text="Submit details", command=self.checkValid).pack()
 
+        # Button to return to main page
+        self.backButton = ttk.Button(self, text="Back", command=lambda: self.controller.showFrame(MainPage))
+
+        self.backButton.pack()
+
     # make sure that values entered are all valid
     def checkValid(self):
         """
@@ -241,13 +249,26 @@ class AddPage(ttk.Frame):
             self.dataValid["use_by"] = False
             allValid = False
 
-        # If all data is valid, display the confirmation screen
+        # If all data is valid, get user to confirm details then submit
         # If some data is invalid, identify the invalid data and highlight 
         # those fields to the user.
         if allValid:
-            self.submitQuery()
+            self.confirmSubmitQuery()
         else:
             self.displayInvalid()
+    
+    def confirmSubmitQuery(self):
+        """Give the user an opportunity to check the data they are about to add to the database
+        """        
+        parameters = self.controller.queryData["parameters"]
+
+        infoString = "You want to add batch with the following parameters to the database: \n"
+        for k, v in parameters.items():
+            infoString = infoString + f"{k} : {v.get()}\n"
+        infoString = infoString + "\nAre you sure?"
+        confirm = askyesno(title="Confirm query submission", message=infoString)
+        if confirm:
+            self.submitQuery()
 
 
 
@@ -290,9 +311,10 @@ class AddPage(ttk.Frame):
         """        
         parameters = self.controller.queryData["parameters"]
 
+
         # Remove leading zeroes from dates
-        delivered_at = removeLeadingZeroes(parameters["delivered_at"].get())
-        use_by = removeLeadingZeroes(parameters["use_by"].get())
+        delivered_at = addLeadingZeroes(parameters["delivered_at"].get())
+        use_by = addLeadingZeroes(parameters["use_by"].get())
 
         conn = sql.connect("dbs/stock_database.db")
         cur = conn.cursor()
@@ -400,7 +422,7 @@ class RemovePage(ttk.Frame):
             "removalReason": []
         }
         self.entries["removalReason"] = [
-            ttk.Radiobutton(self, text=f"{REMOVAL_REASON[i][0]}", value=f"{REMOVAL_REASON[i][1]}", variable=parameters["removalReason"]) for i in range(len(REMOVAL_REASON))
+            ttk.Radiobutton(self, text=f"{k}", value=f"{v}", variable=parameters["removalReason"]) for k, v in REMOVAL_REASON.items()
         ]
         # store for input error warnings for each member of self.data
         # These will be modified to display text if any fields are found to 
@@ -427,6 +449,12 @@ class RemovePage(ttk.Frame):
             self.entriesInvalid[dataField].pack()
 
         ttk.Button(self, text="Submit details", command=self.checkValid).pack()
+
+        # Button to return to main page
+        self.backButton = ttk.Button(self, text="Back", command=lambda: self.controller.showFrame(MainPage))
+
+        self.backButton.pack()
+
 
     # make sure that values entered are all valid
     def checkValid(self):
@@ -474,9 +502,7 @@ class RemovePage(ttk.Frame):
         cur.execute('SELECT delivered_at FROM batches WHERE id = ?', (batchId,))
 
         delivered_at = cur.fetchone()[0]
-        print(f"{delivered_at}")
-        removalDate = removeLeadingZeroes(parameters["removalDate"].get())
-        print(f"{removalDate}")
+        removalDate = parameters["removalDate"].get()
 
         if isDate(removalDate) and not dateInFuture(removalDate) and not dateLessThan(removalDate, delivered_at):
             self.dataValid["removalDate"] = True
@@ -489,12 +515,24 @@ class RemovePage(ttk.Frame):
         # If some data is invalid, identify the invalid data and highlight 
         # those fields to the user.
         if allValid:
-            self.submitQuery()
-            self.controller.showFrame(ResultsPage)
+            self.confirmSubmitQuery()
         else:
             self.displayInvalid()
 
+    def confirmSubmitQuery(self):
+        """Give the user an opportunity to check the data they are about to alter in the database
+        """        
+        parameters = self.controller.queryData["parameters"]
 
+        infoString = f"You want to remove {parameters["quantity"]} units from batch {parameters["batchId"]} with the following parameters to the database: \n"
+        for k, v in parameters.items():
+            if k == "batchId":
+                continue
+            infoString = infoString + f"{k} : {v.get()}\n"
+        infoString = infoString + "\nAre you sure?"
+        confirm = askyesno(title="Confirm query submission", message=infoString)
+        if confirm:
+            self.submitQuery()
 
     def displayInvalid(self):
         """ 
@@ -531,7 +569,7 @@ class RemovePage(ttk.Frame):
         parameters = self.controller.queryData["parameters"]
 
         # Remove leading zeroes from dates
-        removalDate = removeLeadingZeroes(parameters["removalDate"].get())
+        removalDate = addLeadingZeroes(parameters["removalDate"].get())
 
         # Connect to database
         conn = sql.connect("dbs/stock_database.db")
@@ -594,6 +632,8 @@ class CheckBatchPage(ttk.Frame):
     def __init__(self, parent, controller):
         super().__init__(parent)
         self.controller = controller
+
+        '''Setup datafields for query'''
         # Datafields to store information for the sqlite query
         self.controller.queryData["type"] = TYPE_STRING_CHECK
         self.controller.queryData["parameters"] = {
@@ -615,7 +655,8 @@ class CheckBatchPage(ttk.Frame):
             "use_by" : tk.BooleanVar(),
             "recorded_in_database" : tk.BooleanVar(),
         }
-        
+
+        '''Setup widgets'''
         # Frames to seperate the two types of batch query: solely batchId, or
         # other
         self.mainFrames = {
@@ -686,11 +727,10 @@ class CheckBatchPage(ttk.Frame):
                 ttk.Entry(self.labels["recorded_in_database"], textvariable=parameters["recorded_in_database"][1])
             ]
         }
-       
-        # Loop to display page elements
-        # The checkboxes are used to toggle the visibility of the labels and entries
-        # Labels and entries are packed to lock in their relative positions on
-        # the page, then forgotten if they are not being used 
+
+        '''
+        Pack widgets
+        '''
         for d in self.mainFrames.values():
             d.pack()
         for d in self.subFrames.values():
@@ -712,7 +752,19 @@ class CheckBatchPage(ttk.Frame):
                 self.labels[d].pack_forget()
 
         self.submitDetails = ttk.Button(self, text="Submit details", command=self.submitQuery)
+
         self.submitDetails.pack()
+
+        # Button to return to main page
+        self.backButton = ttk.Button(self, text="Back", command=lambda: self.controller.showFrame(MainPage))
+
+        self.backButton.pack()
+
+        # Frame to hold the results of the last submitted query
+        self.resultsFrame = ttk.Frame(self)
+        self.resultsFrame.pack(fill="both", expand=True)
+        # Datafield that will hold the pandastable to show the results when/if it is generated
+        self.resultsTable = None
 
 
     # construct and submit a query to the database
@@ -756,9 +808,13 @@ class CheckBatchPage(ttk.Frame):
 
             # if name is used, add to query
             if self.dataUsed["name"].get():
-                queryString = queryString +"name = ?"
-                queryParameters.append(parameters["name"].get())
-                addAnd = " AND"
+                stockId = parameters["name"].get()
+                if not stockId.isnumeric():
+                    cur.execute("SELECT id FROM stock_names WHERE name = ?", (parameters["name"].get(),))
+                    stockId = cur.fetchone()[0]
+                queryString = queryString +"id = ?"
+                queryParameters.append(stockId)
+                addAnd = " AND "
             
             # Create a subdictionary of ranges to iterate over
             dateRangesToExtract = ["delivered_at", "recorded_in_database", "use_by"]
@@ -767,25 +823,27 @@ class CheckBatchPage(ttk.Frame):
             # Iterate over the dateranges, adding them if they are used
             for r in dateRanges:
                 if dateRanges[r].get():
-                    queryString = queryString + f"{addAnd}{r} <= ? AND {r} >= ?"
-                    queryParameters.append(parameters[r][0].get())
-                    queryParameters.append(parameters[r][1].get())
-                    addAnd = " AND"
+                    queryString = queryString + f"{addAnd}{r} >= ? AND {r} <= ?"
+                    queryParameters.append(addLeadingZeroes(parameters[r][0].get()))
+                    queryParameters.append(addLeadingZeroes(parameters[r][1].get()))
+                    addAnd = " AND "
         #Close off the queryString
         queryString = queryString + ")"
 
-        #execute the query using the queryString and the queryParameters
-        cur.execute(queryString, tuple(queryParameters))
-        rows = cur.fetchall()
-        conn.close()
-        if len(rows) != 0:
-            self.controller.queryData["result"] = rows
-            self.controller.showFrame(ResultsPage)
+        # Use pandas to read the select query
+        result = read_sql_query(queryString, conn, params=tuple(queryParameters))
+        if not result.empty:
+            # Turn result pandas dataframe into a pandastable
+            self.resultsTable = Table(self.resultsFrame, dataframe=result, showtoolbar=True, showstatusbar=True)
+            # Ensure that the table has completed all setup before displaying
+            self.resultsTable.update_idletasks()
+            self.resultsTable.show()
+            self.resultsTable.redraw()
         else:
             showerror(title="Check Failed", message="No data found matching this query")
+        conn.close()
 
 
-    
     def toggleBatchSearch(self):
         """
         Toggles the others mainFrame off if searching for specific
@@ -849,32 +907,3 @@ class CheckTransactionPage(ttk.Frame):
 class CheckStockPage(ttk.Frame):
     def __init__(self, parent, controller):
         pass
-
-class ResultsPage(ttk.Frame):
-    def __init__(self, parent, controller):
-        super().__init__(parent)
-        self.controller = controller
-        self.header = ttk.Label(self, text="RESULT?").pack()
-        # Show the success or failure of the database operation
-        queryType = self.controller.queryData["type"]
-        outcome = self.controller.queryData["outcome"]
-        self.outcomeLabel = ttk.Label(self, text=f"The database operation {outcome}").pack()
-        self.parameterLabel = ttk.Label(self, text=f"")
-        # If add or remove operations succeeded, show the parameters that were 
-        # used. 
-        # This gives another opportunity to make sure that the data was 
-        # correct, and potentially to correct mistakes.
-        if outcome is not FAILURE_STRING_G and queryType is not TYPE_STRING_CHECK: 
-            self.parameterLabel["text"] = f"The following data was {OUTCOME_STRINGS[queryType]} the database: "
-            for k, v in self.controller.queryData["parameters"].items():
-                ttk.Label(self, text=f"{k} : {v.get()}").pack()
-            # If the query is an add, displays the new batch ID number to make future removals easier
-            if queryType is TYPE_STRING_ADD:
-                ttk.Label(self,text=f"The batch ID number is {self.controller.queryData["result"][0]}. Please record this for future transactions.")
-        # If the parameter was a database check, and the list of results is not too long, display them on screen.
-        elif queryType is TYPE_STRING_CHECK and len(self.controller.queryData["result"]) <= MAX_ROWS_TO_DISPLAY:
-            pass
-
-        # provide a button to return to the main page
-        self.exitButton = ttk.Button(self, text="Return to Main Page", command=lambda: self.controller.showFrame(MainPage)).pack()
-        # If the query type was check, provide an option to output the results to a csv file
