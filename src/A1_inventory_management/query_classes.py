@@ -8,7 +8,7 @@ from tkinter import ttk
 from tkinter import filedialog as fd
 from tkinter.messagebox import showerror, showinfo, askyesno
 import sqlite3 as sql
-from pandas import read_sql_query
+import pandas as pd
 from pandastable import Table, TableModel
 
 from A1_inventory_management.utils.datetime_helpers import isDate, dateInFuture, addLeadingZeroes, dateLessThan, getCurrentDateTime
@@ -880,7 +880,7 @@ class CheckBatchPage(ttk.Frame):
         queryString = queryString + ")"
 
         # Use pandas to read the select query
-        parameters["result"] = read_sql_query(queryString, conn, params=tuple(queryParameters))
+        parameters["result"] = pd.read_sql_query(queryString, conn, params=tuple(queryParameters))
         if not parameters["result"].empty:
             # show export to csv button
             self.csvButton.grid(column=0, row=1, padx=10)
@@ -1207,7 +1207,7 @@ class CheckTransactionPage(ttk.Frame):
         queryString = queryString + ")"
 
         # Use pandas to read the select query
-        parameters["result"] = read_sql_query(queryString, conn, params=tuple(queryParameters))
+        parameters["result"] = pd.read_sql_query(queryString, conn, params=tuple(queryParameters))
         if not parameters["result"].empty:
             # show export to csv button
             self.csvButton.grid(column=0, row=1, padx=10)
@@ -1262,5 +1262,233 @@ class CheckTransactionPage(ttk.Frame):
   
 
 class CheckStockPage(ttk.Frame):
+    """
+    Page frame used to construct a query to get information from the
+    batches table
+
+    """    
     def __init__(self, parent, controller):
-        pass
+        super().__init__(parent)
+        self.controller = controller
+        self.controller.centreWindow(400, 400)
+        '''Setup datafields for query'''
+        # Datafields to store information for the sqlite query
+        self.controller.queryData["type"] = TYPE_STRING_CHECK
+        self.controller.queryData["parameters"] = {
+            "stock_id" : tk.StringVar(),
+        }
+        # assign this variable to shorten the path
+        parameters = self.controller.queryData["parameters"]
+
+        # datafields to record if the respective variable field is used
+        # This doubles as a flag to show that partiular field
+        self.dataUsed = {
+            "full_inventory" : tk.BooleanVar(value=True),
+            "stock_id" : tk.BooleanVar(),
+        }
+
+        '''Setup and place primary widgets'''
+        # Frames to divide the screen between fields/buttons and the results table
+        self.sectionFrames = {
+            "main" : ttk.Frame(self),
+            "results" : ttk.Frame(self)
+        }
+        # set up grid on main frame
+
+        self.sectionFrames["main"].columnconfigure(index=0, weight=4)
+        self.sectionFrames["main"].columnconfigure(index=1, weight=1)
+
+        self.sectionFrames["main"].rowconfigure(index=0, weight=1)
+        self.sectionFrames["main"].rowconfigure(index=1, weight=1)
+        self.sectionFrames["main"].rowconfigure(index=2, weight=1)
+
+        # Create large container frame for datafields
+        self.dataFieldFrame = ttk.Frame(self.sectionFrames["main"])
+
+        for d in self.sectionFrames.values():
+            d.pack(fill="both", expand=True)
+        
+        self.dataFieldFrame.grid(column=0, row=0, rowspan=3)
+
+        '''Setup widgets'''
+        # Frames to seperate the two types of batch query: solely fullInventory, or
+        # other
+        self.mainFrames = {
+            "full_inventory" : ttk.Frame(self.dataFieldFrame),
+            "other" : ttk.Frame(self.dataFieldFrame)
+        }
+
+        # subframes to seperate the different query fields.
+        self.subFrames = {
+            "stock_id" : ttk.Frame(self.mainFrames["other"]),
+        }
+
+
+        # Checkboxes to choose which variables to use for the search
+        self.checkBoxes = {
+            "full_inventory" : ttk.Checkbutton(
+                self.mainFrames["full_inventory"],
+                text="Show full inventory",
+                variable=self.dataUsed["full_inventory"]),
+            "stock_id" : ttk.Checkbutton(
+                self.subFrames["stock_id"], 
+                text="Search by Stock Name", 
+                command=lambda: self.toggleVar("stock_id"), 
+                variable=self.dataUsed["stock_id"]),
+        }
+       # Labelframes for each field
+        self.labels = {
+            "stock_id": ttk.LabelFrame(self.subFrames["stock_id"], text="Name/Id Number of Good"),
+        }
+
+        # Entries for each field, bound to the requisite LabelFrame. The three date ranges have attached labels showig if they are to or from
+        self.entries = {
+            "stock_id": ttk.Entry(self.labels["stock_id"], textvariable=parameters["stock_id"]),
+        }
+
+        '''
+        Place datafield widgets
+        '''
+        # Place datafields
+        for d in self.mainFrames.values():
+            d.pack(padx=10, anchor=tk.W)
+        for d in self.subFrames.values():
+            d.pack(anchor=tk.W)
+        for d in self.checkBoxes.values():
+            d.pack(anchor=tk.W)
+        for d in self.labels.values():
+            d.pack(padx=10, anchor=tk.W)
+        for k, d in self.entries.items():
+            d.pack(anchor=tk.W, padx=10, pady=10)
+
+        # hide unused datafields
+        for d in self.dataUsed:
+            if not self.dataUsed[d].get():
+                self.labels[d].pack_forget()
+
+        '''Place button widgets'''
+        self.submitDetails = ttk.Button(self.sectionFrames["main"], text="Submit details", command=self.submitQuery)
+        self.submitDetails.grid(column=1, row=0, padx=10)
+
+        # Construct but do not place Button to export to csv
+        self.csvButton = ttk.Button(self.sectionFrames["main"], text="Export results to .csv", command= self.exportToCsv)
+
+        # Button to return to main page
+        self.backButton = ttk.Button(self.sectionFrames["main"], text="Back", command=lambda: self.controller.showFrame(MainPage))
+        self.backButton.grid(column=1, row=2, padx=10)
+
+        # Frame to hold the results of the last submitted query
+        self.resultsFrame = ttk.Frame(self)
+
+        # Datafield that will hold the pandastable to show the results when/if it is generated
+        self.resultsTable = None
+
+
+    # construct and submit a query to the database
+    def submitQuery(self):
+        """
+        Constructs a SELECT query based on the data entered and chosen. If no
+        data is found, an error message pops up.
+
+        As these functions do not modify the database in any way, they did not
+        need the additional layers of protection provided by the validation 
+        step.
+        """  
+        # Check to see at least one parameter has been entered. If none have 
+        # been entered, exit the function   
+        noneUsed = True
+        for b in self.dataUsed.values():
+            if b.get():
+                noneUsed = False
+                break
+        if noneUsed:
+            return
+        
+        parameters = self.controller.queryData["parameters"]
+
+        conn = sql.connect("dbs/stock_database.db")
+        cur = conn.cursor()
+        cur.execute("PRAGMA foreign_keys = ON")
+
+        queryString = "SELECT * FROM stock_names"
+        # If the search is of one specific stock, add that stock onto the end 
+        # of this query and execute. 
+        # Otherwise, select the whole table
+        query = None
+        if self.dataUsed["stock_id"].get():
+            stockId = parameters["stock_id"].get()
+            if not stockId.isnumeric():
+                cur.execute("SELECT id FROM stock_names WHERE name = ?", (parameters["stock_id"].get(),))
+                stockId = cur.fetchone()[0]
+            queryString = queryString +" WHERE (id = ?)"
+            query = pd.read_sql_query(queryString, conn, params=(stockId,))
+        else:
+            query = pd.read_sql_query(queryString, conn)
+        
+        quantities = []
+        # Iterate over the list of stock. Get the name, use it to run a search 
+        # of batches of that stock. Tally up the total quantity_current, and
+        # append that to quantities.
+        for row in query.itertuples(index=False):
+            batches = pd.read_sql_query("SELECT quantity_current FROM batches WHERE stock_id = ?", conn, params=(row.id,))
+            quantity = 0
+            # Get current stock remaining in batches
+            for q in batches.itertuples(index=False):
+                print(f"{q}")
+                quantity = quantity + int(q.quantity_current)
+            quantities.append(quantity)
+        
+        query["quantity"] = quantities
+        parameters["result"] = query
+        if not parameters["result"].empty:
+            # show export to csv button
+            self.csvButton.grid(column=0, row=1, padx=10)
+
+            # Increase size of parent window to display table
+            self.controller.centreWindow(800, 600)
+            self.csvButton.grid(column=1, row=1, padx=10)
+            # show the results frame
+            self.sectionFrames["results"].pack(fill="both", expand=True)
+            # Turn result pandas dataframe into a pandastable
+            self.resultsTable = Table(self.sectionFrames["results"], dataframe=parameters["result"], editable=False, showstatusbar=True)
+            # Ensure that the table has completed all setup before displaying
+            self.resultsTable.update_idletasks()
+            self.resultsTable.show()
+            self.resultsTable.redraw()
+            self.resultsTable.autoResizeColumns()
+        else:
+            showerror(title="Check Failed", message="No data found matching this query")
+        conn.close()
+
+    def exportToCsv(self):
+        # open window to choose folder location
+        fileName = fd.asksaveasfilename(
+            defaultextension=".csv",
+            filetypes=[("CSV files", "*.csv"), ("All files", "*.*")],
+            title="Save exported query"
+        )
+
+        if fileName:
+            # save file with set name
+            self.resultsTable.model.df.to_csv(fileName, index=False)
+            showinfo(title="Export complete", message=f"Query results exported to {fileName}.")
+            
+
+    def toggleVar(self, varName, makeVisible = None):
+        """Toggle visibility of a varName on or off
+
+        Args:
+            varName (string): string identifying which varName is to be toggled
+
+            makeVisible(bool): Boolean that on None toggles, on True turns 
+                        varName on, and on False turns varName off
+        """
+        # If no mode entered, default to toggle
+        if makeVisible is None:
+            makeVisible = not self.labels[varName].winfo_ismapped()
+
+        if makeVisible:
+            self.labels[varName].pack(anchor=tk.W)
+        else:
+            self.labels[varName].pack_forget()
+    
