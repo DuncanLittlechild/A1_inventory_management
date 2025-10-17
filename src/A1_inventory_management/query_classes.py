@@ -48,20 +48,21 @@ class App(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("Fylde Aero inventory mangement")
+        
+        # set height and width
+        self.width = 300
+        self.height = 300
+
         # Get screen height and width
         screenWidth = self.winfo_screenwidth()
         screenHeight = self.winfo_screenheight()
         
-        # set height and width
-        width = 600
-        height = 400
-        
         #find the offsets needed to centre the window
-        offsetX = int(screenWidth/2 - width / 2)
-        offsetY = int(screenHeight / 2 - height / 2)
+        offsetX = int(screenWidth/2 - self.width / 2)
+        offsetY = int(screenHeight / 2 - self.height / 2)
     
         # Set the window to the centre of the screen
-        self.geometry(f'{width}x{height}+{offsetX}+{offsetY}')
+        self.geometry(f'{self.width}x{self.height}+{offsetX}+{offsetY}')
 
         # Create container for active frames
         self.container = ttk.Frame(self)
@@ -76,7 +77,7 @@ class App(tk.Tk):
         }
 
         self.showFrame(MainPage)
-        
+
     # Method to display a new frame of a set class
     def showFrame(self, frameClass):
         """Remove a prior frame and display a new one of the class frameClass
@@ -85,6 +86,8 @@ class App(tk.Tk):
             frameClass (class <ttk.Frame>): the name of the class of the frame
               to be instantiated
         """        
+        # Reset the container to the default size
+        self.centreWindow()
         # Clear the current frame from the container
         for widget in self.container.winfo_children():
             widget.destroy()
@@ -92,6 +95,25 @@ class App(tk.Tk):
         frame = frameClass(self.container, self)
         # display the new frame
         frame.pack(fill="both", expand="true")
+
+    def centreWindow(self, width = None, height = None):
+        # Get window height and width
+        if width is None:
+            width = self.width
+        if height is None:
+            height = self.height
+
+        # Get screen height and width
+        screenWidth = self.winfo_screenwidth()
+        screenHeight = self.winfo_screenheight()
+        
+        #find the offsets needed to centre the window
+        offsetX = int(screenWidth/2 - width / 2)
+        offsetY = int(screenHeight / 2 - height / 2)
+    
+        # Set the window to the centre of the screen
+        self.geometry(f'{width}x{height}+{offsetX}+{offsetY}')
+
 
 ####################
 ## class MainPage ##
@@ -144,17 +166,17 @@ class AddPage(ttk.Frame):
 
         # Store for labels for each member of self.data
         self.labels = {
-            "name": ttk.Label(self, text="Name/Id Number of Good"),
-            "quantity": ttk.Label(self, text="Quantity of good"),
-            "delivered_at": ttk.Label(self, text="Delivery Date (YYYY-MM-DD)"),
-            "use_by": ttk.Label(self, text="Use By Date (YYYY-MM-DD)")
+            "name": ttk.Labelframe(self, text="Name/Id Number of Good"),
+            "quantity": ttk.Labelframe(self, text="Quantity of good"),
+            "delivered_at": ttk.Labelframe(self, text="Delivery Date (YYYY-MM-DD)"),
+            "use_by": ttk.Labelframe(self, text="Use By Date (YYYY-MM-DD)")
         }
         # store for entries for each member of self.data
         self.entries = {
-            "name": ttk.Entry(self, textvariable=parameters["name"]),
-            "quantity": ttk.Entry(self, textvariable=parameters["quantity"]),
-            "delivered_at": ttk.Entry(self, textvariable=parameters["delivered_at"]),
-            "use_by": ttk.Entry(self, textvariable=parameters["use_by"])
+            "name": ttk.Entry(self.labels["name"], textvariable=parameters["name"]),
+            "quantity": ttk.Entry(self.labels["quantity"], textvariable=parameters["quantity"]),
+            "delivered_at": ttk.Entry(self.labels["delivered_at"], textvariable=parameters["delivered_at"]),
+            "use_by": ttk.Entry(self.labels["use_by"], textvariable=parameters["use_by"])
         }
         # store for input error warnings for each member of self.data
         # These will be modified to display text if any fields are found to 
@@ -172,7 +194,7 @@ class AddPage(ttk.Frame):
         # for that.
         for dataField in self.labels:
             self.labels[dataField].pack()
-            self.entries[dataField].pack()
+            self.entries[dataField].pack(padx=5, pady=5)
             self.entriesInvalid[dataField].pack()
 
         ttk.Button(self, text="Submit details", command=self.checkValid).pack()
@@ -620,7 +642,7 @@ class CheckBatchPage(ttk.Frame):
     def __init__(self, parent, controller):
         super().__init__(parent)
         self.controller = controller
-
+        self.controller.centreWindow(400, 400)
         '''Setup datafields for query'''
         # Datafields to store information for the sqlite query
         self.controller.queryData["type"] = TYPE_STRING_CHECK
@@ -644,12 +666,35 @@ class CheckBatchPage(ttk.Frame):
             "recorded_in_database" : tk.BooleanVar(),
         }
 
+        '''Setup and place primary widgets'''
+        # Frames to divide the screen between fields/buttons and the results table
+        self.sectionFrames = {
+            "main" : ttk.Frame(self),
+            "results" : ttk.Frame(self)
+        }
+        # set up grid on main frame
+
+        self.sectionFrames["main"].columnconfigure(index=0, weight=4)
+        self.sectionFrames["main"].columnconfigure(index=1, weight=1)
+
+        self.sectionFrames["main"].rowconfigure(index=0, weight=1)
+        self.sectionFrames["main"].rowconfigure(index=1, weight=1)
+        self.sectionFrames["main"].rowconfigure(index=2, weight=1)
+
+        # Create large container frame for datafields
+        self.dataFieldFrame = ttk.Frame(self.sectionFrames["main"])
+
+        for d in self.sectionFrames.values():
+            d.pack(fill="both", expand=True)
+        
+        self.dataFieldFrame.grid(column=0, row=0, rowspan=3)
+
         '''Setup widgets'''
         # Frames to seperate the two types of batch query: solely batchId, or
         # other
         self.mainFrames = {
-            "batchId" : ttk.Frame(self),
-            "other" : ttk.Frame(self)
+            "batchId" : ttk.Frame(self.dataFieldFrame),
+            "other" : ttk.Frame(self.dataFieldFrame)
         }
 
         # subframes to seperate the different query fields.
@@ -698,7 +743,7 @@ class CheckBatchPage(ttk.Frame):
             "recorded_in_database": ttk.LabelFrame(self.subFrames["recorded_in_database"], text="Recorded Date Range (YYYY-MM-DD)")
         }
 
-        # Entries for each field, bound to the requisite LabelFrame
+        # Entries for each field, bound to the requisite LabelFrame. The three date ranges have attached labels showig if they are to or from
         self.entries = {
             "batchId": ttk.Entry(self.labels["batchId"], textvariable=parameters["batchId"]),
             "name": ttk.Entry(self.labels["name"], textvariable=parameters["name"]),
@@ -717,42 +762,47 @@ class CheckBatchPage(ttk.Frame):
         }
 
         '''
-        Pack widgets
+        Place datafield widgets
         '''
+        # Place datafields
         for d in self.mainFrames.values():
-            d.pack()
+            d.pack(padx=10, anchor=tk.W)
         for d in self.subFrames.values():
-            d.pack()
+            d.pack(anchor=tk.W)
         for d in self.checkBoxes.values():
-            d.pack()
+            d.pack(anchor=tk.W)
         for d in self.labels.values():
-            d.pack()
-        for d in self.entries.values():
+            d.pack(padx=10, anchor=tk.W)
+        for k, d in self.entries.items():
             if isinstance(d, list):
-                d[0].pack()
-                d[1].pack()
+                # Set up columns in the daterange box
+                self.labels[k].rowconfigure(0, weight=1, pad=5)
+                self.labels[k].rowconfigure(1, weight=1, pad=5)
+                self.labels[k].columnconfigure(0, weight=1)
+                self.labels[k].columnconfigure(1, weight=5)
+                #Create the labels and bind them to the right places
+                ttk.Label(self.labels[k], text="From").grid(column=0, row=0)
+                d[0].grid(column=1, row=0)
+                ttk.Label(self.labels[k], text="To").grid(column=0, row=1)
+                d[1].grid(column=1, row=1)
             else:
-                d.pack()
+                d.pack(anchor=tk.W, padx=10, pady=10)
 
         # hide unused datafields
         for d in self.dataUsed:
             if not self.dataUsed[d].get():
                 self.labels[d].pack_forget()
 
-        self.submitDetails = ttk.Button(self, text="Submit details", command=self.submitQuery)
+        '''Place button widgets'''
+        self.submitDetails = ttk.Button(self.sectionFrames["main"], text="Submit details", command=self.submitQuery)
+        self.submitDetails.grid(column=1, row=0, padx=10)
 
-        self.submitDetails.pack()
+        # Construct but do not place Button to export to csv
+        self.csvButton = ttk.Button(self.sectionFrames["main"], text="Export results to .csv", command= self.exportToCsv)
 
         # Button to return to main page
-        self.backButton = ttk.Button(self, text="Back", command=lambda: self.controller.showFrame(MainPage))
-
-        self.backButton.pack()
-        
-        # Button to export to csv
-        self.csvButton = ttk.Button(self, text="Export results to .csv", command= self.exportToCsv)
-        self.csvButton.pack()
-        self.csvButton.pack_forget()
-
+        self.backButton = ttk.Button(self.sectionFrames["main"], text="Back", command=lambda: self.controller.showFrame(MainPage))
+        self.backButton.grid(column=1, row=2, padx=10)
 
         # Frame to hold the results of the last submitted query
         self.resultsFrame = ttk.Frame(self)
@@ -828,11 +878,15 @@ class CheckBatchPage(ttk.Frame):
         parameters["result"] = read_sql_query(queryString, conn, params=tuple(queryParameters))
         if not parameters["result"].empty:
             # show export to csv button
-            self.csvButton.pack()
+            self.csvButton.grid(column=0, row=1, padx=10)
+
+            # Increase size of parent window to display table
+            self.controller.centreWindow(800, 600)
+            self.csvButton.grid(column=1, row=1, padx=10)
             # show the results frame
-            self.resultsFrame.pack(fill="both", expand=True)
+            self.sectionFrames["results"].pack(fill="both", expand=True)
             # Turn result pandas dataframe into a pandastable
-            self.resultsTable = Table(self.resultsFrame, dataframe=parameters["result"], editable=False, showstatusbar=True)
+            self.resultsTable = Table(self.sectionFrames["results"], dataframe=parameters["result"], editable=False, showstatusbar=True)
             # Ensure that the table has completed all setup before displaying
             self.resultsTable.update_idletasks()
             self.resultsTable.show()
@@ -871,7 +925,7 @@ class CheckBatchPage(ttk.Frame):
         # If the batchNumber label is not visible, toggle it on and hide all 
         # subframes
         else:
-            self.labels["batchId"].pack()
+            self.labels["batchId"].pack(anchor=tk.W)
             for f in self.subFrames.values():
                 f.pack_forget()
 
@@ -888,7 +942,7 @@ class CheckBatchPage(ttk.Frame):
             makeVisible = not self.labels["name"].winfo_ismapped()
 
         if makeVisible:
-            self.labels["name"].pack()
+            self.labels["name"].pack(anchor=tk.W)
         else:
             self.labels["name"].pack_forget()
 
@@ -906,7 +960,7 @@ class CheckBatchPage(ttk.Frame):
             makeVisible = not self.labels[dateRange].winfo_ismapped()
 
         if makeVisible:
-            self.labels[dateRange].pack()
+            self.labels[dateRange].pack(anchor=tk.W)
         else:
             self.labels[dateRange].pack_forget()
     

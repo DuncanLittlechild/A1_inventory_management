@@ -1,1 +1,1 @@
-# src/A1-inventory-management/__init__.py
+# src/A1_inventory_management/__init__.py
