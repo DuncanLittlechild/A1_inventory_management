@@ -40,6 +40,11 @@ REMOVAL_REASON = {
     "Destroyed": "destroyed"  
 }
 
+TRANSACTION_TYPE = [
+    TRANSACTION_TYPE_ADDITION_STRING,
+    TRANSACTION_TYPE_REMOVAL_STRING
+]
+
 
 ###############
 ## class App ##
@@ -716,22 +721,22 @@ class CheckBatchPage(ttk.Frame):
             "name" : ttk.Checkbutton(
                 self.subFrames["name"], 
                 text="Search by Stock Name", 
-                command= self.toggleName, 
+                command=lambda: self.toggleVar["name"], 
                 variable=self.dataUsed["name"]),
             "delivered_at" : ttk.Checkbutton(
                 self.subFrames["delivered_at"], 
                 text="Search by delivery date", 
-                command=lambda: self.toggleDateRange("delivered_at"), 
+                command=lambda: self.toggleVar("delivered_at"), 
                 variable=self.dataUsed["delivered_at"]),
             "use_by" : ttk.Checkbutton(
                 self.subFrames["use_by"], 
                 text="Search by use by date", 
-                command=lambda: self.toggleDateRange("use_by"), 
+                command=lambda: self.toggleVar("use_by"), 
                 variable=self.dataUsed["use_by"]),
             "recorded_in_database" : ttk.Checkbutton(
                 self.subFrames["recorded_in_database"], 
                 text="Search by date batch recorded", 
-                command=lambda: self.toggleDateRange("recorded_in_database"), 
+                command=lambda: self.toggleVar("recorded_in_database"), 
                 variable=self.dataUsed["recorded_in_database"])
         }
        # Labelframes for each field
@@ -929,45 +934,332 @@ class CheckBatchPage(ttk.Frame):
             for f in self.subFrames.values():
                 f.pack_forget()
 
-
-    def toggleName(self, makeVisible = None):
-        """Toggle visibility of the name field on or off, or set it if makeInvsisible is given a value.
-
-        Args:
-            makeVisible(bool): Boolean that on None toggles, on True turns 
-            DateRange on, and on False turns DateRange off
-        """     
-        # if no makeVisible is entered, default to toggle
-        if makeVisible is None:
-            makeVisible = not self.labels["name"].winfo_ismapped()
-
-        if makeVisible:
-            self.labels["name"].pack(anchor=tk.W)
-        else:
-            self.labels["name"].pack_forget()
-
-    def toggleDateRange(self, dateRange, makeVisible = None):
-        """Toggle visibility of a dateRange on or off
+    def toggleVar(self, varName, makeVisible = None):
+        """Toggle visibility of a varName on or off
 
         Args:
-            dateRange (string): string identifying which daterange is to be toggled
+            varName (string): string identifying which varName is to be toggled
 
             makeVisible(bool): Boolean that on None toggles, on True turns 
-                        DateRange on, and on False turns DateRange off
+                        varName on, and on False turns varName off
         """
         # If no mode entered, default to toggle
         if makeVisible is None:
-            makeVisible = not self.labels[dateRange].winfo_ismapped()
+            makeVisible = not self.labels[varName].winfo_ismapped()
 
         if makeVisible:
-            self.labels[dateRange].pack(anchor=tk.W)
+            self.labels[varName].pack(anchor=tk.W)
         else:
-            self.labels[dateRange].pack_forget()
+            self.labels[varName].pack_forget()
     
     
 class CheckTransactionPage(ttk.Frame):
+    """
+    Page frame used to construct a query to get information from the
+    transactions table
+
+    """    
     def __init__(self, parent, controller):
-        pass
+        super().__init__(parent)
+        self.controller = controller
+        self.controller.centreWindow(400, 600)
+        '''Setup datafields for query'''
+        # Datafields to store information for the sqlite query
+        self.controller.queryData["type"] = TYPE_STRING_CHECK
+        self.controller.queryData["parameters"] = {
+            "transaction_type" : tk.StringVar(),
+            "stock_id" : tk.StringVar(),
+            "occured_at" : [tk.StringVar(), tk.StringVar()],
+            "recorded_in_database" : [tk.StringVar(), tk.StringVar()],
+            "removal_reason" : tk.StringVar()
+        }
+        # assign this variable to shorten the path
+        parameters = self.controller.queryData["parameters"]
+
+        # datafields to record if the respective variable field is used
+        # This doubles as a flag to show that partiular field
+        self.dataUsed = {
+            "transaction_type" : tk.BooleanVar(value=True),
+            "stock_id" : tk.BooleanVar(),
+            "occured_at" : tk.BooleanVar(),
+            "recorded_in_database" : tk.BooleanVar(),
+            "removal_reason" : tk.BooleanVar(),
+        }
+
+        '''Setup and place primary widgets'''
+        # Frames to divide the screen between fields/buttons and the results table
+        self.sectionFrames = {
+            "main" : ttk.Frame(self),
+            "results" : ttk.Frame(self)
+        }
+        # set up grid on main frame
+
+        self.sectionFrames["main"].columnconfigure(index=0, weight=4)
+        self.sectionFrames["main"].columnconfigure(index=1, weight=1)
+
+        self.sectionFrames["main"].rowconfigure(index=0, weight=1)
+        self.sectionFrames["main"].rowconfigure(index=1, weight=1)
+        self.sectionFrames["main"].rowconfigure(index=2, weight=1)
+
+        # Create large container frame for datafields
+        self.dataFieldFrame = ttk.Frame(self.sectionFrames["main"])
+
+        for d in self.sectionFrames.values():
+            d.pack(fill="both", expand=True)
+        
+        self.dataFieldFrame.grid(column=0, row=0, rowspan=3)
+
+        '''Setup widgets'''
+        # subframes to seperate the different query fields.
+        self.subFrames = {
+            "transaction_type" : ttk.Frame(self.dataFieldFrame),
+            "stock_id" : ttk.Frame(self.dataFieldFrame),
+            "occured_at" : ttk.Frame(self.dataFieldFrame),
+            "recorded_in_database" : ttk.Frame(self.dataFieldFrame),
+            "removal_reason" : ttk.Frame(self.dataFieldFrame)
+        }
+
+
+        # Checkboxes to choose which variables to use for the search
+        self.checkBoxes = {
+            "transaction_type" : ttk.Checkbutton(
+                self.subFrames["transaction_type"],
+                text="Search by Transaction Type",
+                command=lambda: self.toggleVar("transaction_type"),
+                variable=self.dataUsed["transaction_type"]),
+            "stock_id" : ttk.Checkbutton(
+                self.subFrames["stock_id"],
+                text="Search by Stock Name/id",
+                command=lambda: self.toggleVar("stock_id"),
+                variable=self.dataUsed["stock_id"]),
+            "occured_at" : ttk.Checkbutton(
+                self.subFrames["occured_at"], 
+                text="Search by date transaction occured", 
+                command=lambda: self.toggleVar("occured_at"), 
+                variable=self.dataUsed["occured_at"]),
+            "recorded_in_database" : ttk.Checkbutton(
+                self.subFrames["recorded_in_database"], 
+                text="Search by date transaction recorded", 
+                command=lambda: self.toggleVar("recorded_in_database"), 
+                variable=self.dataUsed["recorded_in_database"]),
+            "removal_reason" : ttk.Checkbutton(
+                self.subFrames["removal_reason"], 
+                text="Search by Reason Removed", 
+                command=lambda: self.toggleVar("removal_reason"), 
+                variable=self.dataUsed["removal_reason"]),
+        }
+       # Labelframes for each field
+        self.labels = {
+            "transaction_type": ttk.LabelFrame(self.subFrames["transaction_type"], text="Transaction type"),
+            "stock_id": ttk.LabelFrame(self.subFrames["stock_id"], text="Name/Id Number of Good"),
+            "occured_at": ttk.LabelFrame(self.subFrames["occured_at"], text="Transaction Date Range (YYYY-MM-DD)"),
+            "recorded_in_database": ttk.LabelFrame(self.subFrames["recorded_in_database"], text="Recorded Date Range (YYYY-MM-DD)"),
+            "removal_reason": ttk.LabelFrame(self.subFrames["removal_reason"], text="Removal Reason"),
+        }
+
+        # Entries for each field, bound to the requisite LabelFrame. The two date ranges have attached labels showig if they are to or from
+        self.entries = {
+            "transaction_type": [
+                ttk.Radiobutton(self.labels["transaction_type"], text=f"{v}", value=f"{v}", variable=parameters["transaction_type"])
+                for v in TRANSACTION_TYPE
+            ],
+            "stock_id": ttk.Entry(self.labels["stock_id"], textvariable=parameters["stock_id"]),
+            "occured_at": [
+                ttk.Entry(self.labels["occured_at"], textvariable=parameters["occured_at"][0]),
+                ttk.Entry(self.labels["occured_at"], textvariable=parameters["occured_at"][1])
+            ],
+            "recorded_in_database": [
+                ttk.Entry(self.labels["recorded_in_database"], textvariable=parameters["recorded_in_database"][0]),
+                ttk.Entry(self.labels["recorded_in_database"], textvariable=parameters["recorded_in_database"][1])
+            ],
+            "removal_reason": [
+                ttk.Radiobutton(self.labels["removal_reason"], text=f"{k}", value=f"{v}", variable=parameters["removal_reason"])
+                for k, v in REMOVAL_REASON.items()
+            ]
+        }
+
+        '''
+        Place datafield widgets
+        '''
+        # Place datafields
+        for d in self.subFrames.values():
+            d.pack(anchor=tk.W)
+        for d in self.checkBoxes.values():
+            d.pack(anchor=tk.W)
+        for d in self.labels.values():
+            d.pack(padx=10, anchor=tk.W)
+        for k, d in self.entries.items():
+            # If it's a list
+            if isinstance(d, list):
+                # Check to see if its a list of radiobuttons
+                if isinstance(d[0], ttk.Radiobutton):
+                    for item in d:
+                        item.pack(anchor=tk.W)
+                else:
+                    # Set up columns in the daterange boxes
+                    self.labels[k].rowconfigure(0, weight=1, pad=5)
+                    self.labels[k].rowconfigure(1, weight=1, pad=5)
+                    self.labels[k].columnconfigure(0, weight=1)
+                    self.labels[k].columnconfigure(1, weight=5)
+                    #Create the labels and bind them to the right places
+                    ttk.Label(self.labels[k], text="From").grid(column=0, row=0)
+                    d[0].grid(column=1, row=0)
+                    ttk.Label(self.labels[k], text="To").grid(column=0, row=1)
+                    d[1].grid(column=1, row=1)
+            else:
+                d.pack(anchor=tk.W, padx=10, pady=10)
+
+        # hide unused datafields
+        for d in self.dataUsed:
+            if not self.dataUsed[d].get():
+                self.labels[d].pack_forget()
+
+        '''Place button widgets'''
+        self.submitDetails = ttk.Button(self.sectionFrames["main"], text="Submit details", command=self.submitQuery)
+        self.submitDetails.grid(column=1, row=0, padx=10)
+
+        # Construct but do not place Button to export to csv
+        self.csvButton = ttk.Button(self.sectionFrames["main"], text="Export results to .csv", command= self.exportToCsv)
+
+        # Button to return to main page
+        self.backButton = ttk.Button(self.sectionFrames["main"], text="Back", command=lambda: self.controller.showFrame(MainPage))
+        self.backButton.grid(column=1, row=2, padx=10)
+
+        # Frame to hold the results of the last submitted query
+        self.resultsFrame = ttk.Frame(self)
+
+        # Datafield that will hold the pandastable to show the results when/if it is generated
+        self.resultsTable = None
+
+
+    # construct and submit a query to the database
+    def submitQuery(self):
+        """
+        Constructs a SELECT query based on the data entered and chosen. If no
+        data is found, an error message pops up.
+
+        As these functions do not modify the database in any way, they did not
+        need the additional layers of protection provided by the validation 
+        step.
+        """  
+        # Check to see at least one parameter has been entered. If none have 
+        # been entered, exit the function   
+        noneUsed = True
+        for b in self.dataUsed.values():
+            if b.get():
+                noneUsed = False
+                break
+        if noneUsed:
+            return
+        
+        parameters = self.controller.queryData["parameters"]
+
+        conn = sql.connect("dbs/stock_database.db")
+        cur = conn.cursor()
+        cur.execute("PRAGMA foreign_keys = ON")
+
+        # Builds a sql SELECT string a bit at a time, then a tuple to insert
+        # the relevant values
+        queryString = "SELECT * FROM transactions WHERE ("
+        queryParameters = []
+        # if batchId is used, then that is the only parameter needed for the query
+
+        # Use the addAnd flag to add an AND to the start of every
+        # additional prompt except the first
+        addAnd = ""
+
+
+        # if transaction_type is used, add to query
+        if self.dataUsed["transaction_type"].get():
+            queryString = queryString +"transaction_type = ?"
+            queryParameters.append(parameters["transaction_type"].get())
+            addAnd = " AND "
+        
+        # if stock_id is used, add to query
+        if self.dataUsed["stock_id"].get():
+            stockId = parameters["stock_id"].get()
+            if not stockId.isnumeric():
+                cur.execute("SELECT id FROM stock_names WHERE name = ?", (parameters["stock_id"].get(),))
+                stockId = cur.fetchone()[0]
+            queryString = queryString +"stock_id = ?"
+            queryParameters.append(stockId)
+            addAnd = " AND "
+        
+        # Create a subdictionary of ranges to iterate over
+        dateRangesToExtract = ["delivered_at", "occured_at"]
+        dateRanges = {key: self.dataUsed[key] for key in dateRangesToExtract if key in self.dataUsed}
+
+        # Iterate over the dateranges, adding them if they are used
+        for r in dateRanges:
+            if dateRanges[r].get():
+                queryString = queryString + f"{addAnd}{r} >= ? AND {r} <= ?"
+                queryParameters.append(addLeadingZeroes(parameters[r][0].get()))
+                queryParameters.append(addLeadingZeroes(parameters[r][1].get()))
+                addAnd = " AND "
+                
+        # If removal_reason has been used, add it to the query
+        if self.dataUsed["removal_reason"].get():
+            queryString = queryString +"removal_reason = ?"
+            queryParameters.append(parameters["removal_reason"].get())
+            addAnd = " AND "
+
+        #Close off the queryString
+        queryString = queryString + ")"
+
+        # Use pandas to read the select query
+        parameters["result"] = read_sql_query(queryString, conn, params=tuple(queryParameters))
+        if not parameters["result"].empty:
+            # show export to csv button
+            self.csvButton.grid(column=0, row=1, padx=10)
+
+            # Increase size of parent window to display table
+            self.controller.centreWindow(800, 600)
+            self.csvButton.grid(column=1, row=1, padx=10)
+            # show the results frame
+            self.sectionFrames["results"].pack(fill="both", expand=True)
+            # Turn result pandas dataframe into a pandastable
+            self.resultsTable = Table(self.sectionFrames["results"], dataframe=parameters["result"], editable=False, showstatusbar=True)
+            # Ensure that the table has completed all setup before displaying
+            self.resultsTable.update_idletasks()
+            self.resultsTable.show()
+            self.resultsTable.redraw()
+            self.resultsTable.autoResizeColumns()
+        else:
+            showerror(title="Check Failed", message="No data found matching this query")
+        conn.close()
+
+    def exportToCsv(self):
+        # open window to choose folder location
+        fileName = fd.asksaveasfilename(
+            defaultextension=".csv",
+            filetypes=[("CSV files", "*.csv"), ("All files", "*.*")],
+            title="Save exported query"
+        )
+
+        if fileName:
+            # save file with set name
+            self.resultsTable.model.df.to_csv(fileName, index=False)
+            showinfo(title="Export complete", message=f"Query results exported to {fileName}.")
+
+
+    def toggleVar(self, varName, makeVisible = None):
+        """Toggle visibility of a varName on or off
+
+        Args:
+            varName (string): string identifying which varName is to be toggled
+
+            makeVisible(bool): Boolean that on None toggles, on True turns 
+                        varName on, and on False turns varName off
+        """
+        # If no mode entered, default to toggle
+        if makeVisible is None:
+            makeVisible = not self.labels[varName].winfo_ismapped()
+
+        if makeVisible:
+            self.labels[varName].pack(anchor=tk.W)
+        else:
+            self.labels[varName].pack_forget()
+  
 
 class CheckStockPage(ttk.Frame):
     def __init__(self, parent, controller):
