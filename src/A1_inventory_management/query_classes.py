@@ -7,9 +7,14 @@ import tkinter as tk
 from tkinter import ttk
 from tkinter import filedialog as fd
 from tkinter.messagebox import showerror, showinfo, askyesno
+root = tk.Tk()
+tk.Label(root, text="Loading modules... please wait").pack()
+root.update()
 import sqlite3 as sql
 import pandas as pd
 from pandastable import Table, TableModel
+
+root.destroy()
 
 from A1_inventory_management.utils.datetime_helpers import isDate, dateInFuture, addLeadingZeroes, dateLessThan, getCurrentDateTime
 
