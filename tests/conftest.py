@@ -1,5 +1,5 @@
 import pytest
-import A1_inventory_management.query_classes as qc
+import A1_inventory_management.core as qc
 
 @pytest.fixture(scope="session")
 def root():

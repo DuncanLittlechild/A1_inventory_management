@@ -2,7 +2,7 @@ import pytest
 from unittest.mock import patch, Mock
 import tkinter as tk
 from tkinter import ttk
-import A1_inventory_management.query_classes as qc
+import A1_inventory_management.core as qc
 
 @pytest.fixture(scope="module")
 def root():
