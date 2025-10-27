@@ -54,6 +54,7 @@ TRANSACTION_TYPE = [
 ###############
 ## class App ##
 ###############
+# Main Tkinter window
 class App(tk.Tk):
     def __init__(self):
         super().__init__()
@@ -397,13 +398,10 @@ class AddPage(ttk.Frame):
         self.controller.queryData["outcome"] = SUCCESS_STRING_G
         #endregion
 
-
-
-########################
-########################
-### class RemovePage ###
-########################
-########################
+######################
+## class RemovePage ##
+######################
+# Frame to display data to construct a query to remove data from a sqlite database
 class RemovePage(ttk.Frame):
     """
     Frame to remove data from the databases
@@ -644,6 +642,10 @@ class RemovePage(ttk.Frame):
         conn.commit()
         conn.close()
 
+##########################
+## class CheckbatchPage ##
+##########################
+# Frame to display data to construct a query to retrieve data from the batch
 class CheckBatchPage(ttk.Frame):
     """
     Page frame used to construct a query to get information from the
@@ -967,7 +969,10 @@ class CheckBatchPage(ttk.Frame):
         else:
             self.labels[varName].pack_forget()
     
-    
+################################
+## class CheckTransactionPage ##
+################################
+# Frame to display data to construct a query to remove data from a sqlite database
 class CheckTransactionPage(ttk.Frame):
     """
     Page frame used to construct a query to get information from the
@@ -1188,7 +1193,7 @@ class CheckTransactionPage(ttk.Frame):
 
         # if transaction_type is used, add to query
         if self.dataUsed["transaction_type"].get():
-            queryString = queryString +"transaction_type = ?"
+            queryString = queryString +f"{addAnd}transaction_type = ?"
             queryParameters.append(parameters["transaction_type"].get())
             addAnd = " AND "
         
@@ -1198,7 +1203,7 @@ class CheckTransactionPage(ttk.Frame):
             if not stockId.isnumeric():
                 cur.execute("SELECT id FROM stock_names WHERE name = ?", (parameters["stock_id"].get(),))
                 stockId = cur.fetchone()[0]
-            queryString = queryString +"stock_id = ?"
+            queryString = queryString +f"{addAnd}stock_id = ?"
             queryParameters.append(stockId)
             addAnd = " AND "
         
@@ -1216,7 +1221,7 @@ class CheckTransactionPage(ttk.Frame):
                 
         # If removal_reason has been used, add it to the query
         if self.dataUsed["removal_reason"].get():
-            queryString = queryString +"removal_reason = ?"
+            queryString = queryString +f"{addAnd}removal_reason = ?"
             queryParameters.append(parameters["removal_reason"].get())
             addAnd = " AND "
 
@@ -1285,7 +1290,10 @@ class CheckTransactionPage(ttk.Frame):
             self.labels[varName].pack_forget()
         #endregion
   
-
+##########################
+## class CheckStockPage ##
+##########################
+# Frame to display data to construct a query to remove data from a sqlite database
 class CheckStockPage(ttk.Frame):
     """
     Page frame used to construct a query to get information from the
