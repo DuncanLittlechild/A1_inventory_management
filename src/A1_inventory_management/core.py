@@ -2,7 +2,6 @@
 # and execute the sqlite3 queries.
 
 # See the UML diagram for a clearer picture of their relationship to each other
-import os
 import tkinter as tk
 from tkinter import ttk
 from tkinter import filedialog as fd
@@ -12,11 +11,12 @@ tk.Label(root, text="Loading modules... please wait").pack()
 root.update()
 import sqlite3 as sql
 import pandas as pd
-from pandastable import Table, TableModel
+from pandastable import Table
 
 root.destroy()
 
-from A1_inventory_management.utils.datetime_helpers import isDate, dateInFuture, addLeadingZeroes, dateLessThan, getCurrentDateTime
+from A1_inventory_management.utils.datetime_helpers import isDate, dateInFuture, addLeadingZeroes, dateLessThan
+from A1_inventory_management.database_init import G_DB_PATH
 
 TRANSACTION_TYPE_ADDITION_STRING = 'addition'
 TRANSACTION_TYPE_REMOVAL_STRING = 'removal'
@@ -227,7 +227,7 @@ class AddPage(ttk.Frame):
         # use flag to see if any data are incorrectly formatted
         allValid = True
         # check name is valid by running a quick sqlite query
-        conn = sql.connect("dbs/stock_database.db")
+        conn = sql.connect(G_DB_PATH)
         cur = conn.cursor()
 
         #Check to see if a stock number was entered instead of a name
@@ -339,7 +339,7 @@ class AddPage(ttk.Frame):
         delivered_at = addLeadingZeroes(parameters["delivered_at"].get())
         use_by = addLeadingZeroes(parameters["use_by"].get())
 
-        conn = sql.connect("dbs/stock_database.db")
+        conn = sql.connect(G_DB_PATH)
         cur = conn.cursor()
         cur.execute("PRAGMA foreign_keys = ON")
 
@@ -489,7 +489,7 @@ class RemovePage(ttk.Frame):
         allValid = True
 
         #Connect to the database
-        conn = sql.connect("dbs/stock_database.db")
+        conn = sql.connect(G_DB_PATH)
         cur = conn.cursor() 
 
         batchId = parameters["batchId"].get()
@@ -592,7 +592,7 @@ class RemovePage(ttk.Frame):
         removalDate = addLeadingZeroes(parameters["removalDate"].get())
 
         # Connect to database
-        conn = sql.connect("dbs/stock_database.db")
+        conn = sql.connect(G_DB_PATH)
         cur = conn.cursor()
         cur.execute("PRAGMA foreign_keys = ON")
 
@@ -847,7 +847,7 @@ class CheckBatchPage(ttk.Frame):
         
         parameters = self.controller.queryData["parameters"]
 
-        conn = sql.connect("dbs/stock_database.db")
+        conn = sql.connect(G_DB_PATH)
         cur = conn.cursor()
         cur.execute("PRAGMA foreign_keys = ON")
 
@@ -1177,7 +1177,7 @@ class CheckTransactionPage(ttk.Frame):
         
         parameters = self.controller.queryData["parameters"]
 
-        conn = sql.connect("dbs/stock_database.db")
+        conn = sql.connect(G_DB_PATH)
         cur = conn.cursor()
         cur.execute("PRAGMA foreign_keys = ON")
 
@@ -1439,7 +1439,7 @@ class CheckStockPage(ttk.Frame):
         
         parameters = self.controller.queryData["parameters"]
 
-        conn = sql.connect("dbs/stock_database.db")
+        conn = sql.connect(G_DB_PATH)
         cur = conn.cursor()
         cur.execute("PRAGMA foreign_keys = ON")
 

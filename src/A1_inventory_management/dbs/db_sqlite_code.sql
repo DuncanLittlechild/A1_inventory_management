@@ -3,6 +3,13 @@ CREATE TABLE IF NOT EXISTS stock_names (
   name TEXT NOT NULL CHECK (LENGTH(name) <= 50)
 );
 
+INSERT OR IGNORE INTO stock_names (name)
+VALUES
+    ('nuts'),
+    ('steel plates'),
+    ('screws'),
+    ('folding chairs')
+
 CREATE TABLE IF NOT EXISTS batches (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   stock_id INTEGER NOT NULL,
