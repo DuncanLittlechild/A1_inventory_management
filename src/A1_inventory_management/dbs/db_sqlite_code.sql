@@ -8,7 +8,7 @@ VALUES
     ('nuts'),
     ('steel plates'),
     ('screws'),
-    ('folding chairs')
+    ('folding chairs');
 
 CREATE TABLE IF NOT EXISTS batches (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
