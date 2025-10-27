@@ -61,7 +61,7 @@ class App(tk.Tk):
         
         # set height and width
         self.width = 300
-        self.height = 300
+        self.height = 500
 
         # Get screen height and width
         screenWidth = self.winfo_screenwidth()
@@ -214,7 +214,6 @@ class AddPage(ttk.Frame):
 
         self.backButton.pack()
 
-    # make sure that values entered are all valid
     def checkValid(self):
         """
         Check each value in self.data in turn to ensure that it conforms to the
@@ -222,6 +221,7 @@ class AddPage(ttk.Frame):
         all values are valid, then the query is submitted; otherwise, the 
         invalid fields are flagged and the user is asked to re-enter that data.
         """        
+        #region checkValid
         parameters = self.controller.queryData["parameters"]
         # use flag to see if any data are incorrectly formatted
         allValid = True
@@ -276,10 +276,12 @@ class AddPage(ttk.Frame):
             self.confirmSubmitQuery()
         else:
             self.displayInvalid()
+        #endregion
     
     def confirmSubmitQuery(self):
         """Give the user an opportunity to check the data they are about to add to the database
-        """        
+        """
+        #region cSQ       
         parameters = self.controller.queryData["parameters"]
 
         infoString = "You want to add batch with the following parameters to the database: \n"
@@ -289,14 +291,14 @@ class AddPage(ttk.Frame):
         confirm = askyesno(title="Confirm query submission", message=infoString)
         if confirm:
             self.submitQuery()
-
-
+        #endregion
 
     def displayInvalid(self):
         """ 
         Check each datafield in turn, and if it has been flagged as invalid,
         display an error message. Otherwise, remove existing error messages.
-        """        
+        """
+        #region dI        S
         if not self.dataValid["name"]:
             self.entriesInvalid["name"]["text"] = "Name/id number was not found in database. Please check spelling"
         else:
@@ -316,19 +318,19 @@ class AddPage(ttk.Frame):
             self.entriesInvalid["use_by"]["text"] = "Use by date must be in the form YYYY-MM-DD"
         else:
             self.entriesInvalid["use_by"]["text"] = ""
+        #endregion
 
-
-    # construct and submit a query to the database
     def submitQuery(self):
         """
         First add a record to the batches database, then add a record to the
-        additions database, save results to the controller, and then going to 
+        transactions database, save results to the controller, and then go to 
         the results page.
 
         The database updates are transactional. Failure will result in
         successful updates being undone, details of the failure being saved to
         the controller, and then going to the results page.
         """        
+        #region sQ
         parameters = self.controller.queryData["parameters"]
 
 
@@ -387,13 +389,13 @@ class AddPage(ttk.Frame):
             return
         conn.commit()
         conn.close()
-        self.controller.queryData["result"].append(batchId)
         infoString = "An entry was added to the batches database with the following parameters: \n"
         for k, v in parameters.items():
             infoString = infoString + f"{k} : {v.get()}\n"
         infoString = infoString + f"\nIt was assigned the batch id {batchId}."
         showinfo(title="Add Successful", message=infoString)
         self.controller.queryData["outcome"] = SUCCESS_STRING_G
+        #endregion
 
 
 
@@ -544,7 +546,7 @@ class RemovePage(ttk.Frame):
         """        
         parameters = self.controller.queryData["parameters"]
 
-        infoString = f"You want to remove {parameters["quantity"]} units from batch {parameters["batchId"]} with the following parameters to the database: \n"
+        infoString = f"You want to remove {parameters["quantity"].get()} units from batch {parameters["batchId"].get()} with the following parameters: \n"
         for k, v in parameters.items():
             if k == "batchId":
                 continue
@@ -641,7 +643,6 @@ class RemovePage(ttk.Frame):
         
         conn.commit()
         conn.close()
-        self.controller.queryData["outcome"] = SUCCESS_STRING_G
 
 class CheckBatchPage(ttk.Frame):
     """
@@ -831,6 +832,7 @@ class CheckBatchPage(ttk.Frame):
         need the additional layers of protection provided by the validation 
         step.
         """  
+        #region sQ
         # Check to see at least one parameter has been entered. If none have 
         # been entered, exit the function   
         noneUsed = True
@@ -905,8 +907,13 @@ class CheckBatchPage(ttk.Frame):
         else:
             showerror(title="Check Failed", message="No data found matching this query")
         conn.close()
+        #endregion
 
     def exportToCsv(self):
+        """
+        Saves the data currently displayed to a csv at a user-defined location.
+        """
+        #region eTC
         # open window to choose folder location
         fileName = fd.asksaveasfilename(
             defaultextension=".csv",
@@ -918,6 +925,7 @@ class CheckBatchPage(ttk.Frame):
             # save file with set name
             self.resultsTable.model.df.to_csv(fileName, index=False)
             showinfo(title="Export complete", message=f"Query results exported to {fileName}.")
+        #endregion
 
     def toggleBatchSearch(self):
         """
@@ -925,6 +933,7 @@ class CheckBatchPage(ttk.Frame):
         batch, or on if not.
         As each batch number has but one match, refining is not necessary
         """ 
+        #region tBS
         # If the batchnumber label is visible, toggle it off and display all
         # subframes
         if self.labels["batchId"].winfo_ismapped():
@@ -938,6 +947,7 @@ class CheckBatchPage(ttk.Frame):
             self.labels["batchId"].pack(anchor=tk.W)
             for f in self.subFrames.values():
                 f.pack_forget()
+        
 
     def toggleVar(self, varName, makeVisible = None):
         """Toggle visibility of a varName on or off
@@ -1141,12 +1151,14 @@ class CheckTransactionPage(ttk.Frame):
     def submitQuery(self):
         """
         Constructs a SELECT query based on the data entered and chosen. If no
-        data is found, an error message pops up.
+        data is found, an error message pops up. If data is found, a results table
+        is displayed.
 
         As these functions do not modify the database in any way, they did not
         need the additional layers of protection provided by the validation 
         step.
         """  
+        #region sQ
         # Check to see at least one parameter has been entered. If none have 
         # been entered, exit the function   
         noneUsed = True
@@ -1232,8 +1244,13 @@ class CheckTransactionPage(ttk.Frame):
         else:
             showerror(title="Check Failed", message="No data found matching this query")
         conn.close()
+        #endregion
 
     def exportToCsv(self):
+        """
+        Saves the data currently displayed to a csv at a user-defined location.
+        """
+        #region eTC
         # open window to choose folder location
         fileName = fd.asksaveasfilename(
             defaultextension=".csv",
@@ -1245,6 +1262,7 @@ class CheckTransactionPage(ttk.Frame):
             # save file with set name
             self.resultsTable.model.df.to_csv(fileName, index=False)
             showinfo(title="Export complete", message=f"Query results exported to {fileName}.")
+        #endregion
 
 
     def toggleVar(self, varName, makeVisible = None):
@@ -1256,6 +1274,7 @@ class CheckTransactionPage(ttk.Frame):
             makeVisible(bool): Boolean that on None toggles, on True turns 
                         varName on, and on False turns varName off
         """
+        #region tV
         # If no mode entered, default to toggle
         if makeVisible is None:
             makeVisible = not self.labels[varName].winfo_ismapped()
@@ -1264,6 +1283,7 @@ class CheckTransactionPage(ttk.Frame):
             self.labels[varName].pack(anchor=tk.W)
         else:
             self.labels[varName].pack_forget()
+        #endregion
   
 
 class CheckStockPage(ttk.Frame):
