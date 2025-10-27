@@ -856,6 +856,7 @@ class CheckBatchPage(ttk.Frame):
         queryString = "SELECT * FROM batches WHERE ("
         queryParameters = []
         # if batchId is used, then that is the only parameter needed for the query
+        # Otherwise, construct the query from the selected parameters
         if self.dataUsed["batchId"].get():
             queryString = queryString + "id = ?"
             queryParameters.append(parameters["batchId"].get())
@@ -1184,7 +1185,6 @@ class CheckTransactionPage(ttk.Frame):
         # the relevant values
         queryString = "SELECT * FROM transactions WHERE ("
         queryParameters = []
-        # if batchId is used, then that is the only parameter needed for the query
 
         # Use the addAnd flag to add an AND to the start of every
         # additional prompt except the first
@@ -1459,6 +1459,7 @@ class CheckStockPage(ttk.Frame):
             query = pd.read_sql_query(queryString, conn)
         
         quantities = []
+
         # Iterate over the list of stock. Get the name, use it to run a search 
         # of batches of that stock. Tally up the total quantity_current, and
         # append that to quantities.
@@ -1473,6 +1474,8 @@ class CheckStockPage(ttk.Frame):
         
         query["quantity"] = quantities
         parameters["result"] = query
+
+        # If the query was successful, construct the table
         if not parameters["result"].empty:
             # show export to csv button
             self.csvButton.grid(column=0, row=1, padx=10)
