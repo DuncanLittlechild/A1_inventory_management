@@ -729,7 +729,7 @@ class CheckBatchPage(ttk.Frame):
             "name" : ttk.Checkbutton(
                 self.subFrames["name"], 
                 text="Search by Stock Name", 
-                command=lambda: self.toggleVar["name"], 
+                command=lambda: self.toggleVar("name"), 
                 variable=self.dataUsed["name"]),
             "delivered_at" : ttk.Checkbutton(
                 self.subFrames["delivered_at"], 
@@ -890,8 +890,14 @@ class CheckBatchPage(ttk.Frame):
         queryString = queryString + ")"
 
         # Use pandas to read the select query
-        parameters["result"] = pd.read_sql_query(queryString, conn, params=tuple(queryParameters))
-        if not parameters["result"].empty:
+        result = pd.read_sql_query(queryString, conn, params=tuple(queryParameters))
+
+        if not result.empty:
+            stock_id = result["stock_id"].tolist()
+            stock_name = pd.read_sql_query("SELECT name FROM stock_names WHERE id = ?", conn, params=(stock_id[0],))
+            result["stock_id"] = stock_name["name"]
+            result.rename(columns={'stock_id':'name'}, inplace=True)
+            parameters["result"] = result
             # show export to csv button
             self.csvButton.grid(column=0, row=1, padx=10)
 
@@ -1229,8 +1235,14 @@ class CheckTransactionPage(ttk.Frame):
         queryString = queryString + ")"
 
         # Use pandas to read the select query
-        parameters["result"] = pd.read_sql_query(queryString, conn, params=tuple(queryParameters))
-        if not parameters["result"].empty:
+        result = pd.read_sql_query(queryString, conn, params=tuple(queryParameters))
+        if not result.empty:
+            stock_id = result["stock_id"].tolist()
+            stock_name = pd.read_sql_query("SELECT name FROM stock_names WHERE id = ?", conn, params=(stock_id[0],))
+            result["stock_id"] = stock_name["name"]
+            result.rename(columns={'stock_id':'name'}, inplace=True)
+            result.drop('id', axis=1, inplace=True)
+            parameters["result"] = result
             # show export to csv button
             self.csvButton.grid(column=0, row=1, padx=10)
 

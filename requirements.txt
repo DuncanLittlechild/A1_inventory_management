@@ -1,4 +1,4 @@
--e git+https://github.com/DuncanLittlechild/A1_inventory_management.git@2bb09ce8e7fa6714cef384621d488213abb3574e#egg=A1_inventory_management
+git+https://github.com/DuncanLittlechild/A1_inventory_management.git@2bb09ce8e7fa6714cef384621d488213abb3574e#egg=A1_inventory_management
 contourpy==1.3.3
 cycler==0.12.1
 defusedxml==0.7.1
@@ -15,7 +15,7 @@ packaging==25.0
 pandas==2.3.3
 pandastable==0.14.0
 pillow==12.0.0
-platformdirs==4.5.0
+platformdirs==4.5.0customtkinter
 pyclean==3.1.0
 pyparsing==3.2.5
 python-calamine==0.5.3
