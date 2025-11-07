@@ -531,6 +531,12 @@ class RemovePage(ttk.Frame):
             allValid = False
         conn.close()
 
+        if parameters["removalReason"].get():
+            self.dataValid["removalReason"] = True
+        else:
+            self.dataValid["removalReason"] = False
+            allValid = False
+
         # If all data is valid, display the confirmation screen
         # If some data is invalid, identify the invalid data and highlight 
         # those fields to the user.
@@ -572,7 +578,12 @@ class RemovePage(ttk.Frame):
         if not self.dataValid["removalDate"]:
             self.entriesInvalid["removalDate"]["text"] = "Delivery date must be in the form YYYY-MM-DD"
         else:
-            self.entriesInvalid["delivered_at"]["text"] = ""
+            self.entriesInvalid["removalDate"]["text"] = ""
+        
+        if not self.dataValid["removalReason"]:
+            self.entriesInvalid["removalReason"]["text"] = "Please choose a removal reason"
+        else:
+            self.entriesInvalid["removalReason"]["text"] = ""
 
 
     # construct and submit a query to the database
